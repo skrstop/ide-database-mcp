@@ -7,6 +7,8 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.Messages;
 import com.intellij.ui.JBColor;
 import com.intellij.ui.SearchTextField;
+import com.intellij.ui.components.JBScrollPane;
+import com.intellij.ui.table.JBTable;
 import io.skrstop.ide.databasemcp.service.McpMethodMetricsService;
 import io.skrstop.ide.databasemcp.service.McpRuntimeLogService;
 import io.skrstop.ide.databasemcp.service.McpServerManager;
@@ -54,12 +56,12 @@ public final class DatabaseMcpToolWindowPanel implements Disposable {
     private final JButton stopServiceButton;
 
     private final JButton clearCounterButton;
-    private final JTable methodTable;
+    private final JBTable methodTable;
     private final DefaultTableModel methodTableModel;
     private final TableRowSorter<DefaultTableModel> methodTableSorter;
 
     private final NoWrapTextPane logTextArea;
-    private final JScrollPane logScrollPane;
+    private final JBScrollPane logScrollPane;
     private final SearchTextField logSearchField;
     private final JButton logPrevMatchButton;
     private final JButton logNextMatchButton;
@@ -103,7 +105,7 @@ public final class DatabaseMcpToolWindowPanel implements Disposable {
             }
         };
 
-        methodTable = new JTable(methodTableModel);
+        methodTable = new JBTable(methodTableModel);
         methodTable.setFillsViewportHeight(true);
         methodTable.setRowHeight(Math.max(22, methodTable.getRowHeight() + 4));
         methodTableSorter = new TableRowSorter<>(methodTableModel);
@@ -132,7 +134,7 @@ public final class DatabaseMcpToolWindowPanel implements Disposable {
             caret.setUpdatePolicy(DefaultCaret.NEVER_UPDATE);
         }
 
-        logScrollPane = new JScrollPane(logTextArea);
+        logScrollPane = new JBScrollPane(logTextArea);
         logScrollPane.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_AS_NEEDED);
         syncLogBackground();
 
