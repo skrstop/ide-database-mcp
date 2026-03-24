@@ -1,0 +1,30 @@
+# IntelliJ / JetBrains IDE
+.idea/
+*.iml
+out/
+
+# Gradle
+.gradle/
+.gradle/**
+build/
+
+# Logs
+*.log
+logs/
+
+# OS files
+.DS_Store
+
+# Temp / local env
+*.tmp
+*.swp
+.env
+.env.*
+
+# JVM crash logs
+hs_err_pid*
+replay_pid*
+
+/build/
+/.intellijPlatform/
+/.intellijPlatform/**
