@@ -1,13 +1,13 @@
-package io.skrstop.ide.databasemcp.db;
+package com.skrstop.ide.databasemcp.db;
 
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.PathManager;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ProjectManager;
-import io.skrstop.ide.databasemcp.mcp.ReadOnlySqlGuard;
-import io.skrstop.ide.databasemcp.service.McpRuntimeLogService;
-import io.skrstop.ide.databasemcp.settings.McpSettingsState;
+import com.skrstop.ide.databasemcp.mcp.ReadOnlySqlGuard;
+import com.skrstop.ide.databasemcp.service.McpRuntimeLogService;
+import com.skrstop.ide.databasemcp.settings.McpSettingsState;
 
 import java.lang.reflect.Array;
 import java.lang.reflect.Field;

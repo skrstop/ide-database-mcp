@@ -1,4 +1,4 @@
-package io.skrstop.ide.databasemcp.settings;
+package com.skrstop.ide.databasemcp.settings;
 
 import com.intellij.openapi.application.PathManager;
 import com.intellij.openapi.ide.CopyPasteManager;
@@ -6,7 +6,7 @@ import com.intellij.openapi.options.Configurable;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ProjectManager;
 import com.intellij.openapi.ui.Messages;
-import io.skrstop.ide.databasemcp.service.McpServerManager;
+import com.skrstop.ide.databasemcp.service.McpServerManager;
 import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.Nullable;
 

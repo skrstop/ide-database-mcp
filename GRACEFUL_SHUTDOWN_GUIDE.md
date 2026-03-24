@@ -134,7 +134,7 @@ public class McpAppLifecycleListener implements AppLifecycleListener {
 ```xml
 
 <extensions defaultExtensionNs="com.intellij">
-    <appLifecycleListener implementation="service.io.skrstop.ide.databasemcp.McpAppLifecycleListener"/>
+    <appLifecycleListener implementation="com.skrstop.ide.databasemcp.McpAppLifecycleListener"/>
 </extensions>
 ```
 

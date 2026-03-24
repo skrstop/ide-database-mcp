@@ -1,8 +1,8 @@
-package io.skrstop.ide.databasemcp.startup;
+package com.skrstop.ide.databasemcp.startup;
 
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.startup.StartupActivity;
-import io.skrstop.ide.databasemcp.service.AutoStartService;
+import com.skrstop.ide.databasemcp.service.AutoStartService;
 import org.jetbrains.annotations.NotNull;
 
 public final class McpProjectManagerListener implements StartupActivity.DumbAware {

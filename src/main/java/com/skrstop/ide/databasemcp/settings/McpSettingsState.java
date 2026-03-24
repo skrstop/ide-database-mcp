@@ -1,4 +1,4 @@
-package io.skrstop.ide.databasemcp.settings;
+package com.skrstop.ide.databasemcp.settings;
 
 import com.intellij.DynamicBundle;
 import com.intellij.openapi.application.ApplicationManager;

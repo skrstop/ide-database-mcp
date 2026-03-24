@@ -1,7 +1,5 @@
-package io.skrstop.ide.databasemcp.toolwindow;
+package com.skrstop.ide.databasemcp.toolwindow;
 
-import com.intellij.ide.plugins.IdeaPluginDescriptor;
-import com.intellij.ide.plugins.PluginManagerCore;
 import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.extensions.PluginId;
 import com.intellij.openapi.options.ShowSettingsUtil;
@@ -14,10 +12,11 @@ import com.intellij.openapi.wm.ToolWindowFactory;
 import com.intellij.openapi.wm.ToolWindowManager;
 import com.intellij.ui.content.Content;
 import com.intellij.ui.content.ContentFactory;
+import com.skrstop.ide.databasemcp.icons.DatabaseMcpIcons;
+import com.skrstop.ide.databasemcp.service.PluginStateCompat;
+import com.skrstop.ide.databasemcp.settings.DatabaseMcpMessages;
+import com.skrstop.ide.databasemcp.settings.McpSettingsConfigurable;
 import icons.DatabaseIcons;
-import icons.DatabaseMcpIcons;
-import io.skrstop.ide.databasemcp.settings.DatabaseMcpMessages;
-import io.skrstop.ide.databasemcp.settings.McpSettingsConfigurable;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
@@ -86,9 +85,8 @@ public final class DatabaseMcpToolWindowFactory implements ToolWindowFactory, Du
     }
 
     private static String getDatabaseDependencyError() {
-        PluginId pluginId = PluginId.findId(DATABASE_PLUGIN_ID);
-        IdeaPluginDescriptor descriptor = pluginId == null ? null : PluginManagerCore.getPlugin(pluginId);
-        if (descriptor == null || !descriptor.isEnabled()) {
+        PluginId pluginId = PluginId.getId(DATABASE_PLUGIN_ID);
+        if (PluginStateCompat.isPluginUnavailable(pluginId)) {
             return DatabaseMcpMessages.message("settings.databasePluginMissing", DATABASE_PLUGIN_ID);
         }
 

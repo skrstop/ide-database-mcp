@@ -1,17 +1,15 @@
-package io.skrstop.ide.databasemcp.service;
+package com.skrstop.ide.databasemcp.service;
 
-import com.intellij.ide.plugins.IdeaPluginDescriptor;
-import com.intellij.ide.plugins.PluginManagerCore;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.components.Service;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.extensions.PluginId;
+import com.skrstop.ide.databasemcp.db.IdeDatabaseFacade;
+import com.skrstop.ide.databasemcp.mcp.McpHttpHandler;
+import com.skrstop.ide.databasemcp.settings.DatabaseMcpMessages;
+import com.skrstop.ide.databasemcp.settings.McpSettingsState;
 import com.sun.net.httpserver.HttpServer;
-import io.skrstop.ide.databasemcp.db.IdeDatabaseFacade;
-import io.skrstop.ide.databasemcp.mcp.McpHttpHandler;
-import io.skrstop.ide.databasemcp.settings.DatabaseMcpMessages;
-import io.skrstop.ide.databasemcp.settings.McpSettingsState;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -199,9 +197,8 @@ public final class McpServerManager implements Disposable {
     }
 
     private String validateDatabaseDependency() {
-        PluginId pluginId = PluginId.findId(DATABASE_PLUGIN_ID);
-        IdeaPluginDescriptor descriptor = pluginId == null ? null : PluginManagerCore.getPlugin(pluginId);
-        if (descriptor == null || !descriptor.isEnabled()) {
+        PluginId pluginId = PluginId.getId(DATABASE_PLUGIN_ID);
+        if (PluginStateCompat.isPluginUnavailable(pluginId)) {
             return DatabaseMcpMessages.message("settings.databasePluginMissing", DATABASE_PLUGIN_ID);
         }
 

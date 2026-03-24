@@ -1,5 +1,5 @@
 <idea-plugin>
-    <id>io.skrstop.ide.databasemcp</id>
+    <id>com.skrstop.ide.databasemcp</id>
     <name>IDE Database MCP</name>
     <vendor email="4086824@qq.com" url="https://github.com/skrstop/ide-database-mcp">Skrstop</vendor>
     <description><![CDATA[
@@ -43,24 +43,24 @@
 
     <extensions defaultExtensionNs="com.intellij">
         <applicationConfigurable
-                id="io.skrstop.ide.databasemcpsettings"
+                id="com.skrstop.ide.databasemcpsettings"
                 displayName="Database MCP"
                 parentId="tools"
-                instance="io.skrstop.ide.databasemcp.settings.McpSettingsConfigurable"/>
+                instance="com.skrstop.ide.databasemcp.settings.McpSettingsConfigurable"/>
         <toolWindow
                 id="Database MCP"
                 anchor="right"
                 icon="/icons/databaseMcpToolWindow.svg"
-                factoryClass="io.skrstop.ide.databasemcp.toolwindow.DatabaseMcpToolWindowFactory"
+                factoryClass="com.skrstop.ide.databasemcp.toolwindow.DatabaseMcpToolWindowFactory"
                 canCloseContents="false"/>
         <postStartupActivity
-                implementation="io.skrstop.ide.databasemcp.startup.McpProjectManagerListener"/>
+                implementation="com.skrstop.ide.databasemcp.startup.McpProjectManagerListener"/>
     </extensions>
 
     <applicationListeners>
         <!-- 应用生命周期监听器，处理自启动与关闭时优雅停服 -->
         <listener
-                class="io.skrstop.ide.databasemcp.service.McpAppLifecycleListener"
+                class="com.skrstop.ide.databasemcp.service.McpAppLifecycleListener"
                 topic="com.intellij.ide.AppLifecycleListener"/>
     </applicationListeners>
 </idea-plugin>

@@ -1,10 +1,10 @@
-package io.skrstop.ide.databasemcp.service;
+package com.skrstop.ide.databasemcp.service;
 
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.PathManager;
 import com.intellij.openapi.components.Service;
 import com.intellij.openapi.diagnostic.Logger;
-import io.skrstop.ide.databasemcp.settings.McpSettingsState;
+import com.skrstop.ide.databasemcp.settings.McpSettingsState;
 
 import java.io.BufferedReader;
 import java.io.IOException;

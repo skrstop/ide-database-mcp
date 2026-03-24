@@ -1,4 +1,4 @@
-package io.skrstop.ide.databasemcp.mcp;
+package com.skrstop.ide.databasemcp.mcp;
 
 import java.util.Locale;
 

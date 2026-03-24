@@ -1,4 +1,4 @@
-package icons;
+package com.skrstop.ide.databasemcp.icons;
 
 import com.intellij.openapi.util.IconLoader;
 

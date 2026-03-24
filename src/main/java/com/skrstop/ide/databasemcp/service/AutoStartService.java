@@ -1,11 +1,11 @@
-package io.skrstop.ide.databasemcp.service;
+package com.skrstop.ide.databasemcp.service;
 
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.components.Service;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.Messages;
-import io.skrstop.ide.databasemcp.settings.DatabaseMcpMessages;
-import io.skrstop.ide.databasemcp.settings.McpSettingsState;
+import com.skrstop.ide.databasemcp.settings.DatabaseMcpMessages;
+import com.skrstop.ide.databasemcp.settings.McpSettingsState;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 

@@ -1,4 +1,4 @@
-package io.skrstop.ide.databasemcp.settings;
+package com.skrstop.ide.databasemcp.settings;
 
 import java.util.Locale;
 import java.util.MissingResourceException;

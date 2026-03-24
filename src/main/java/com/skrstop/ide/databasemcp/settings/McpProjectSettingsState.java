@@ -1,4 +1,4 @@
-package io.skrstop.ide.databasemcp.settings;
+package com.skrstop.ide.databasemcp.settings;
 
 import com.intellij.openapi.components.PersistentStateComponent;
 import com.intellij.openapi.components.Service;

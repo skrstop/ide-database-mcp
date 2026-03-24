@@ -1,4 +1,4 @@
-package io.skrstop.ide.databasemcp.service;
+package com.skrstop.ide.databasemcp.service;
 
 import com.intellij.ide.AppLifecycleListener;
 import com.intellij.openapi.diagnostic.Logger;

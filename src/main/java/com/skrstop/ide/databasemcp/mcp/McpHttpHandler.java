@@ -1,9 +1,9 @@
-package io.skrstop.ide.databasemcp.mcp;
+package com.skrstop.ide.databasemcp.mcp;
 
+import com.skrstop.ide.databasemcp.db.IdeDatabaseFacade;
+import com.skrstop.ide.databasemcp.service.McpRuntimeLogService;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
-import io.skrstop.ide.databasemcp.db.IdeDatabaseFacade;
-import io.skrstop.ide.databasemcp.service.McpRuntimeLogService;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;

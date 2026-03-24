@@ -1,14 +1,14 @@
-package io.skrstop.ide.databasemcp.mcp;
+package com.skrstop.ide.databasemcp.mcp;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.intellij.openapi.application.ApplicationManager;
-import io.skrstop.ide.databasemcp.db.IdeDatabaseFacade;
-import io.skrstop.ide.databasemcp.service.McpMethodMetricsService;
-import io.skrstop.ide.databasemcp.service.McpRuntimeLogService;
-import io.skrstop.ide.databasemcp.settings.McpSettingsState;
+import com.skrstop.ide.databasemcp.db.IdeDatabaseFacade;
+import com.skrstop.ide.databasemcp.service.McpMethodMetricsService;
+import com.skrstop.ide.databasemcp.service.McpRuntimeLogService;
+import com.skrstop.ide.databasemcp.settings.McpSettingsState;
 
 import java.util.HashMap;
 import java.util.List;

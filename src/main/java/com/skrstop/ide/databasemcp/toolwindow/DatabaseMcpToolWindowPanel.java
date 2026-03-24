@@ -1,4 +1,4 @@
-package io.skrstop.ide.databasemcp.toolwindow;
+package com.skrstop.ide.databasemcp.toolwindow;
 
 import com.intellij.icons.AllIcons;
 import com.intellij.openapi.Disposable;
@@ -9,11 +9,11 @@ import com.intellij.ui.JBColor;
 import com.intellij.ui.SearchTextField;
 import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.table.JBTable;
-import io.skrstop.ide.databasemcp.service.McpMethodMetricsService;
-import io.skrstop.ide.databasemcp.service.McpRuntimeLogService;
-import io.skrstop.ide.databasemcp.service.McpServerManager;
-import io.skrstop.ide.databasemcp.settings.DatabaseMcpMessages;
-import io.skrstop.ide.databasemcp.settings.McpSettingsState;
+import com.skrstop.ide.databasemcp.service.McpMethodMetricsService;
+import com.skrstop.ide.databasemcp.service.McpRuntimeLogService;
+import com.skrstop.ide.databasemcp.service.McpServerManager;
+import com.skrstop.ide.databasemcp.settings.DatabaseMcpMessages;
+import com.skrstop.ide.databasemcp.settings.McpSettingsState;
 
 import javax.swing.*;
 import javax.swing.Timer;
