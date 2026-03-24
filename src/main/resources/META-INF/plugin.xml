@@ -1,0 +1,29 @@
+<idea-plugin>
+    <id>io.skrstop.ide.databasemcp</id>
+    <name>IDE Database MCP</name>
+    <vendor email="4086824@qq.com" url="https://example.com">Skrstop</vendor>
+    <description><![CDATA[
+        Exposes IntelliJ Database data sources as an MCP-compatible local service.
+    ]]></description>
+
+    <depends>com.intellij.modules.platform</depends>
+    <depends>com.intellij.database</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <applicationConfigurable
+                id="io.skrstop.ide.databasemcpsettings"
+                displayName="Database MCP"
+                parentId="tools"
+                instance="io.skrstop.ide.databasemcp.settings.McpSettingsConfigurable"/>
+        <toolWindow
+                id="Database MCP"
+                anchor="right"
+                icon="/icons/databaseMcpToolWindow.svg"
+                factoryClass="io.skrstop.ide.databasemcp.toolwindow.DatabaseMcpToolWindowFactory"
+                canCloseContents="false"/>
+        <applicationInitializedListener
+                implementation="io.skrstop.ide.databasemcp.startup.McpApplicationInitializedListener"/>
+        <!-- 应用生命周期监听器，在 IDE 关闭时优雅关闭 HttpServer 服务 -->
+        <appLifecycleListener implementation="io.skrstop.ide.databasemcp.service.McpAppLifecycleListener"/>
+    </extensions>
+</idea-plugin>
