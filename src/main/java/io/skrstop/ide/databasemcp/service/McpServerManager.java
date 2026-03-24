@@ -98,6 +98,11 @@ public final class McpServerManager implements Disposable {
     }
 
     public StartResult startWithValidation(String reason) {
+        McpSettingsState.PluginSettingsScope scope = McpSettingsState.getInstance().getPluginSettingsScope();
+        return startWithValidation(reason, scope);
+    }
+
+    public StartResult startWithValidation(String reason, McpSettingsState.PluginSettingsScope scope) {
         String dependencyError = validateDatabaseDependency();
         if (dependencyError != null) {
             LOG.warn("Database MCP start blocked (" + reason + "): " + dependencyError);
@@ -106,7 +111,7 @@ public final class McpServerManager implements Disposable {
         }
 
         McpSettingsState settings = McpSettingsState.getInstance();
-        int port = settings.getPortEffective();
+        int port = settings.getPort(scope);
         String portError = validatePortAvailability(port);
         if (portError != null) {
             LOG.warn("Database MCP start blocked (" + reason + "): " + portError);
@@ -179,20 +184,14 @@ public final class McpServerManager implements Disposable {
         }
     }
 
-    public StartResult onSettingsChanged(boolean oldAutoStart, int oldPort) {
+    public StartResult onSettingsChanged(int oldPort) {
         McpSettingsState settings = McpSettingsState.getInstance();
-        boolean newAutoStart = settings.isAutoStartEffective();
         boolean endpointChanged = oldPort != settings.getPortEffective();
 
         if (running.get() && endpointChanged) {
             stop("settings-endpoint-changed");
             logInfo("Endpoint changed, restarting service");
             return startWithValidation("settings-endpoint-changed");
-        }
-
-        if (!oldAutoStart && newAutoStart && !running.get()) {
-            logInfo("Auto-start enabled in settings");
-            return startWithValidation("settings-autostart-enabled");
         }
 
 

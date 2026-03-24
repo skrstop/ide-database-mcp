@@ -53,9 +53,14 @@
                 icon="/icons/databaseMcpToolWindow.svg"
                 factoryClass="io.skrstop.ide.databasemcp.toolwindow.DatabaseMcpToolWindowFactory"
                 canCloseContents="false"/>
-        <applicationInitializedListener
-                implementation="io.skrstop.ide.databasemcp.startup.McpApplicationInitializedListener"/>
-        <!-- 应用生命周期监听器，在 IDE 关闭时优雅关闭 HttpServer 服务 -->
-        <appLifecycleListener implementation="io.skrstop.ide.databasemcp.service.McpAppLifecycleListener"/>
+        <postStartupActivity
+                implementation="io.skrstop.ide.databasemcp.startup.McpProjectManagerListener"/>
     </extensions>
+
+    <applicationListeners>
+        <!-- 应用生命周期监听器，处理自启动与关闭时优雅停服 -->
+        <listener
+                class="io.skrstop.ide.databasemcp.service.McpAppLifecycleListener"
+                topic="com.intellij.ide.AppLifecycleListener"/>
+    </applicationListeners>
 </idea-plugin>

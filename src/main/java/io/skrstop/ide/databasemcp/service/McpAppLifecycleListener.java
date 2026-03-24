@@ -10,6 +10,7 @@ import com.intellij.openapi.diagnostic.Logger;
 public class McpAppLifecycleListener implements AppLifecycleListener {
     private static final Logger LOG = Logger.getInstance(McpAppLifecycleListener.class);
 
+
     /**
      * 在应用关闭前触发
      * 此时 IDEA 还未开始销毁应用程序

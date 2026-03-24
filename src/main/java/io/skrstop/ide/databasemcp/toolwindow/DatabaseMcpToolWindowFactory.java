@@ -1,6 +1,5 @@
 package io.skrstop.ide.databasemcp.toolwindow;
 
-import com.intellij.icons.AllIcons;
 import com.intellij.ide.plugins.IdeaPluginDescriptor;
 import com.intellij.ide.plugins.PluginManagerCore;
 import com.intellij.openapi.actionSystem.AnActionEvent;
@@ -16,6 +15,7 @@ import com.intellij.openapi.wm.ToolWindowManager;
 import com.intellij.ui.content.Content;
 import com.intellij.ui.content.ContentFactory;
 import icons.DatabaseIcons;
+import icons.DatabaseMcpIcons;
 import io.skrstop.ide.databasemcp.settings.DatabaseMcpMessages;
 import io.skrstop.ide.databasemcp.settings.McpSettingsConfigurable;
 import org.jetbrains.annotations.NotNull;
@@ -37,7 +37,7 @@ public final class DatabaseMcpToolWindowFactory implements ToolWindowFactory, Du
         DumbAwareAction openSettings = new DumbAwareAction(
                 DatabaseMcpMessages.message("toolwindow.openSettings"),
                 DatabaseMcpMessages.message("toolwindow.openSettings"),
-                AllIcons.General.Settings
+                DatabaseMcpIcons.ToolWindowSettings
         ) {
             @Override
             public void actionPerformed(@NotNull AnActionEvent e) {

@@ -195,7 +195,6 @@ public final class McpSettingsConfigurable implements Configurable {
     @Override
     public void apply() {
         McpSettingsState settings = McpSettingsState.getInstance();
-        boolean oldAutoStart = settings.isAutoStartEffective();
         int oldPort = settings.getPortEffective();
         McpSettingsState.PluginSettingsScope selectedScope = selectedPluginSettingsScope();
         McpSettingsState.UiLanguage language = selectedUiLanguage();
@@ -247,7 +246,7 @@ public final class McpSettingsConfigurable implements Configurable {
         settings.setMaxLogFiles(selectedScope, maxLogFiles);
         settings.setReadBufferSize(selectedScope, readBufferSize);
 
-        McpServerManager.StartResult result = manager.onSettingsChanged(oldAutoStart, oldPort);
+        McpServerManager.StartResult result = manager.onSettingsChanged(oldPort);
         if (!result.isSuccess()) {
             showError(language, DatabaseMcpMessages.message(language, "settings.startFailed") + "\n" + result.getMessage());
         }
