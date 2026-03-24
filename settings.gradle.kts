@@ -14,4 +14,4 @@ pluginManagement {
     }
 }
 
-rootProject.name = "database-mcp"
+rootProject.name = "ide-database-mcp"

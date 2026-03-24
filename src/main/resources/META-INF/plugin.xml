@@ -1,9 +1,41 @@
 <idea-plugin>
     <id>io.skrstop.ide.databasemcp</id>
     <name>IDE Database MCP</name>
-    <vendor email="4086824@qq.com" url="https://example.com">Skrstop</vendor>
+    <vendor email="4086824@qq.com" url="https://github.com/skrstop/ide-database-mcp">Skrstop</vendor>
     <description><![CDATA[
-        Exposes IntelliJ Database data sources as an MCP-compatible local service.
+        <p><b>English</b></p>
+        <p><b>IDE Database MCP</b> exposes database connections configured in JetBrains IDEs as a local MCP service, so MCP clients can discover data sources and execute SQL directly from the IDE context.</p>
+
+        <p><b>Tool list (tools/list)</b></p>
+        <ul>
+            <li><code>db.listDataSources</code>: list available IDE-managed data sources.</li>
+            <li><code>db.listDatabases</code>: list databases/catalogs/schemas under a selected data source.</li>
+            <li><code>db.executeQuery</code>: execute read-only query SQL (<code>SELECT</code>/<code>WITH</code>).</li>
+            <li><code>db.executeDml</code>: execute data-changing SQL (<code>INSERT</code>/<code>UPDATE</code>/<code>DELETE</code>/<code>MERGE</code>/<code>REPLACE</code>).</li>
+            <li><code>db.executeDdl</code>: execute schema-changing SQL (<code>CREATE</code>/<code>ALTER</code>/<code>DROP</code>/<code>TRUNCATE</code>/<code>RENAME</code>/<code>COMMENT</code>).</li>
+        </ul>
+
+        <p><b>SQL capability</b>: This plugin supports query, DML, and DDL tools. Actual execution is determined by your database account permissions and data source privileges.</p>
+        <p><b>Requirement</b>: The JetBrains Database Tools plugin is required and must be available (<code>com.intellij.database</code>).</p>
+        <p><b>Source code</b>: <a href="https://github.com/skrstop/ide-database-mcp">https://github.com/skrstop/ide-database-mcp</a></p>
+
+        <hr/>
+
+        <p><b>中文</b></p>
+        <p><b>IDE Database MCP</b> 将 JetBrains IDE 中已配置的数据库连接暴露为本地 MCP 服务，使 MCP 客户端可以直接基于 IDE 上下文发现数据源并执行 SQL。</p>
+
+        <p><b>工具列表（tools/list）</b></p>
+        <ul>
+            <li><code>db.listDataSources</code>：列出 IDE 管理的数据源。</li>
+            <li><code>db.listDatabases</code>：列出指定数据源下的数据库、catalog 和 schema。</li>
+            <li><code>db.executeQuery</code>：执行只读查询 SQL（<code>SELECT</code>/<code>WITH</code>）。</li>
+            <li><code>db.executeDml</code>：执行数据变更 SQL（<code>INSERT</code>/<code>UPDATE</code>/<code>DELETE</code>/<code>MERGE</code>/<code>REPLACE</code>）。</li>
+            <li><code>db.executeDdl</code>：执行结构变更 SQL（<code>CREATE</code>/<code>ALTER</code>/<code>DROP</code>/<code>TRUNCATE</code>/<code>RENAME</code>/<code>COMMENT</code>）。</li>
+        </ul>
+
+        <p><b>SQL 能力说明</b>：本插件支持查询、DML、DDL 三类 SQL 工具；是否可实际执行取决于你的数据库账号权限和数据源权限。</p>
+        <p><b>依赖要求</b>：必须安装并可用 JetBrains Database Tools 插件（<code>com.intellij.database</code>）。</p>
+        <p><b>代码地址</b>：<a href="https://github.com/skrstop/ide-database-mcp">https://github.com/skrstop/ide-database-mcp</a></p>
     ]]></description>
 
     <depends>com.intellij.modules.platform</depends>
