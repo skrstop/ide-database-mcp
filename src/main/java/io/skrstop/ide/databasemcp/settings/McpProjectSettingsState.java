@@ -11,7 +11,7 @@ import org.jetbrains.annotations.Nullable;
 @Service(Service.Level.PROJECT)
 @State(
         name = "DatabaseMcpProjectSettings",
-        storages = @Storage("database_mcp.xml")
+        storages = @Storage("ide_database_mcp.xml")
 )
 public final class McpProjectSettingsState implements PersistentStateComponent<McpSettingsState.State> {
     private McpSettingsState.State state = new McpSettingsState.State();

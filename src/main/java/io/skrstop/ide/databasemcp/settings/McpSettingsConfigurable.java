@@ -21,7 +21,7 @@ import java.awt.event.ItemEvent;
 import java.nio.file.Path;
 
 public final class McpSettingsConfigurable implements Configurable {
-    private static final String SETTINGS_FILE_NAME = "database_mcp.xml";
+    private static final String SETTINGS_FILE_NAME = "ide_database_mcp.xml";
     private static final Insets FULL_WIDTH_INSETS_COMPACT = new Insets(4, 8, 2, 8);
     private static final Insets FIELD_INSETS_COMPACT = new Insets(2, 8, 2, 8);
 

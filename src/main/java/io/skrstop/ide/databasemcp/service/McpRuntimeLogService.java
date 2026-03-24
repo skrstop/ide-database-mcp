@@ -23,7 +23,7 @@ import java.util.concurrent.locks.ReentrantLock;
 public final class McpRuntimeLogService {
     private static final Logger LOG = Logger.getInstance(McpRuntimeLogService.class);
     private static final Logger RUNTIME_LOGGER = Logger.getInstance("DatabaseMcpRuntime");
-    private static final String LOG_FILE_NAME = "database_mcp_runtime.log";
+    private static final String LOG_FILE_NAME = "ide_database_mcp_runtime.log";
 
     private final ReentrantLock lock = new ReentrantLock();
 

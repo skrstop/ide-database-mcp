@@ -14,7 +14,7 @@ import org.jetbrains.annotations.Nullable;
 import java.util.Locale;
 
 @Service(Service.Level.APP)
-@State(name = "DatabaseMcpSettings", storages = @Storage("database_mcp.xml"))
+@State(name = "DatabaseMcpSettings", storages = @Storage("ide_database_mcp.xml"))
 public final class McpSettingsState implements PersistentStateComponent<McpSettingsState.State> {
     private static final int DEFAULT_PORT = 18765;
 
