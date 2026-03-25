@@ -10,6 +10,8 @@ import com.skrstop.ide.databasemcp.mcp.McpToolDefinitions
 import com.skrstop.ide.databasemcp.service.McpRuntimeLogService
 import com.skrstop.ide.databasemcp.settings.McpSettingsState
 
+private val gson = Gson()
+
 class DatabaseMcpToolset : McpToolset {
     private val facade = IdeDatabaseFacade()
 
@@ -25,7 +27,7 @@ class DatabaseMcpToolset : McpToolset {
     suspend fun database_list_datasources(project: String?, scope: String?): String {
         val resolvedScope = parseScope(scope)
         val result = facade.listDataSources(resolveProjectHint(project), resolvedScope)
-        return GSON.toJson(result)
+        return gson.toJson(result)
     }
 
     @McpTool(name = McpToolDefinitions.TOOL_LIST_DATABASES)
@@ -34,7 +36,7 @@ class DatabaseMcpToolset : McpToolset {
         requireText(dataSource, "dataSource")
         val resolvedScope = parseScope(scope)
         val result = facade.listDatabases(resolveProjectHint(project), dataSource, resolvedScope)
-        return GSON.toJson(result)
+        return gson.toJson(result)
     }
 
     @McpTool(name = McpToolDefinitions.TOOL_EXECUTE_SQL_QUERY)
@@ -52,7 +54,7 @@ class DatabaseMcpToolset : McpToolset {
         val effectiveMaxRows = maxRows ?: 200
         val result =
             facade.executeQuerySql(resolveProjectHint(project), dataSource, sql, effectiveMaxRows, resolvedScope)
-        return GSON.toJson(result)
+        return gson.toJson(result)
     }
 
     @McpTool(name = McpToolDefinitions.TOOL_EXECUTE_SQL_DML)
@@ -62,7 +64,7 @@ class DatabaseMcpToolset : McpToolset {
         requireText(sql, "sql")
         val resolvedScope = parseScope(scope)
         val result = facade.executeDmlSql(resolveProjectHint(project), dataSource, sql, resolvedScope)
-        return GSON.toJson(result)
+        return gson.toJson(result)
     }
 
     @McpTool(name = McpToolDefinitions.TOOL_EXECUTE_SQL_DDL)
@@ -72,7 +74,45 @@ class DatabaseMcpToolset : McpToolset {
         requireText(sql, "sql")
         val resolvedScope = parseScope(scope)
         val result = facade.executeDdlSql(resolveProjectHint(project), dataSource, sql, resolvedScope)
-        return GSON.toJson(result)
+        return gson.toJson(result)
+    }
+
+    @McpTool(name = McpToolDefinitions.TOOL_EXECUTE_NOSQL_QUERY)
+    @McpDescription(description = McpToolDefinitions.KT_DESC_EXECUTE_NOSQL_QUERY)
+    suspend fun database_execute_nosql_query(
+        project: String?,
+        scope: String?,
+        dataSource: String,
+        statement: String,
+        maxRows: Int?
+    ): String {
+        requireText(dataSource, "dataSource")
+        requireText(statement, "statement")
+        val resolvedScope = parseScope(scope)
+        val effectiveMaxRows = maxRows ?: 200
+        val result = facade.executeNoSqlQuery(
+            resolveProjectHint(project),
+            dataSource,
+            statement,
+            effectiveMaxRows,
+            resolvedScope
+        )
+        return gson.toJson(result)
+    }
+
+    @McpTool(name = McpToolDefinitions.TOOL_EXECUTE_NOSQL_WRITE_DELETE)
+    @McpDescription(description = McpToolDefinitions.KT_DESC_EXECUTE_NOSQL_WRITE_DELETE)
+    suspend fun database_execute_nosql_write_delete(
+        project: String?,
+        scope: String?,
+        dataSource: String,
+        statement: String
+    ): String {
+        requireText(dataSource, "dataSource")
+        requireText(statement, "statement")
+        val resolvedScope = parseScope(scope)
+        val result = facade.executeNoSqlWriteDelete(resolveProjectHint(project), dataSource, statement, resolvedScope)
+        return gson.toJson(result)
     }
 
     private fun parseScope(scope: String?): McpSettingsState.DataSourceScope? {
@@ -80,7 +120,7 @@ class DatabaseMcpToolset : McpToolset {
         return try {
             // 注意：确保 Java 端的 DataSourceScope 是 public enum
             McpSettingsState.DataSourceScope.valueOf(scope.trim().uppercase())
-        } catch (ex: Exception) {
+        } catch (_: Exception) {
             null
         }
     }
@@ -97,11 +137,5 @@ class DatabaseMcpToolset : McpToolset {
         if (value.isNullOrBlank()) {
             throw IllegalArgumentException("Missing required argument: $field")
         }
-    }
-
-    companion object {
-        // 使用 @JvmStatic 或直接引用
-        @JvmStatic
-        private val GSON = Gson()
     }
 }

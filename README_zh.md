@@ -25,14 +25,14 @@ IDE 内的数据库能力。
 ## 主要功能
 
 - 将 Database 能力封装为 MCP 工具：
-    - `database_list_data_sources` — 列出已配置数据源，每项会包含根据 JDBC URL/驱动推断的 `type`（MySQL、PostgreSQL、MongoDB
-      等）；若两者都无法识别具体厂商，`type` 将返回 `Custom`。
-    - `database_list_databases` — 列出某个数据源下的 catalog/schema，兼容 MySQL、PostgreSQL、Oracle、SQL
-      Server、SQLite、CockroachDB、H2 等主流 SQL 引擎以及支持元数据的 NoSQL 连接（MongoDB、Apache Cassandra、Redis
-      等），当元数据不可获取时可降级使用 `database_execute_query` 探查。
-    - `database_execute_query` — 执行只读 SQL
-    - `database_execute_dml` — 执行 DML（数据操作）语句
-    - `database_execute_ddl` — 执行 DDL（结构变更）语句
+    - `database_list_datasources` — 列出已配置数据源。
+    - `database_list_databases` — 在可获取元数据时列出 catalog/schema。
+    - `database_execute_sql_query` — SQL 查询用途工具。
+    - `database_execute_sql_dml` — SQL 数据变更用途工具。
+    - `database_execute_sql_ddl` — SQL 结构变更用途工具。
+    - `database_execute_nosql_query` — NoSQL 查询用途工具。
+    - `database_execute_nosql_write_delete` — NoSQL 写入/删除用途工具。
+- 执行约束以工具说明和参数说明为准：调用方需自行选择正确工具；服务端不再做 SQL/NoSQL 关键字判断或写死 DB 类型拦截。
 - 插件设置页面：`Settings | Tools | Database MCP`
 - 支持本地 MCP 服务自动启动
 - 支持数据源范围控制：`GLOBAL` / `PROJECT` / `ALL`
@@ -113,28 +113,33 @@ curl -s http://127.0.0.1:8765/mcp \
 # 列出数据源
 curl -s http://127.0.0.1:8765/mcp \
   -H 'Content-Type: application/json' \
-  -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"database_list_data_sources","arguments":{}}}'
-
-`database_list_data_sources` 返回的数据源条目中包含一个 `type` 标签，该值来自 JDBC URL 或驱动元数据；如果两者都无法识别具体厂商，则返回 `Custom`。
+  -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"database_list_datasources","arguments":{}}}'
 ```
 
 ### 4.1）数据库列举兼容性
 
-`database_list_databases` 依赖 IDE 数据源提供的 JDBC 元数据，兼容的数据库分为主流 SQL 引擎和支持元数据的 NoSQL 连接：
-
-- **SQL 引擎：** MySQL、PostgreSQL、Oracle、SQL Server、SQLite、CockroachDB、H2
-- **支持元数据的 NoSQL：** MongoDB、Apache Cassandra、Redis
-
-若某个连接器未列出或未通过 JDBC 提供 catalog/schema，建议切换到 `database_execute_query` 手动查询。
+`database_list_databases` 依赖 IDE 数据源提供的 JDBC 元数据。若连接器未暴露 catalog/schema，建议使用执行工具手动查询。
 
 ### 5）执行 SQL 示例
 
-将 `YOUR_DS_NAME` 替换为 `database_list_data_sources` 返回的数据源名称。
+将 `YOUR_DS_NAME` 替换为 `database_list_datasources` 返回的数据源名称。
 
 ```bash
 curl -s http://127.0.0.1:8765/mcp \
   -H 'Content-Type: application/json' \
-  -d '{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"database_execute_query","arguments":{"dataSource":"YOUR_DS_NAME","sql":"SELECT 1","maxRows":100}}}'
+  -d '{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"database_execute_sql_query","arguments":{"dataSource":"YOUR_DS_NAME","sql":"SELECT 1","maxRows":100}}}'
+```
+
+### 6）执行 NoSQL 示例
+
+```bash
+curl -s http://127.0.0.1:8765/mcp \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"database_execute_nosql_query","arguments":{"dataSource":"YOUR_DS_NAME","statement":"db.users.find({})","maxRows":100}}}'
+
+curl -s http://127.0.0.1:8765/mcp \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"database_execute_nosql_write_delete","arguments":{"dataSource":"YOUR_DS_NAME","statement":"db.users.deleteMany({inactive:true})"}}}'
 ```
 
 说明：SQL 执行依赖 IDE 内配置的 JDBC 连接，插件不会把凭据导出到外部存储。

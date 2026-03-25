@@ -32,15 +32,15 @@ bundled `com.intellij.database` plugin is available and enabled.
 ## Key features
 
 - Exposes Database capabilities as MCP tools:
-    - `database_list_data_sources` — list configured data sources. Each item includes the inferred `type` label (MySQL,
-      PostgreSQL, MongoDB, etc.) derived from the JDBC URL/driver so the client understands the flavor of the
-      connection; when neither field identifies a recognizable vendor the tool reports `type` as `Custom`.
-    - `database_list_databases` — list catalogs/schemas in one data source. Works with mainstream SQL engines (MySQL,
-      PostgreSQL, Oracle, SQL Server, SQLite, CockroachDB, H2) and metadata-aware NoSQL connectors (MongoDB, Apache
-      Cassandra, Redis, etc.). When metadata is missing fall back to `database_execute_query` for manual inspection.
-    - `database_execute_query` — execute read-only SQL
-    - `database_execute_dml` — execute DML statements
-    - `database_execute_ddl` — execute DDL statements
+    - `database_list_datasources` — list configured data sources.
+    - `database_list_databases` — list catalogs/schemas in one data source when metadata is available.
+    - `database_execute_sql_query` — SQL query-use tool.
+    - `database_execute_sql_dml` — SQL data-modification-use tool.
+    - `database_execute_sql_ddl` — SQL schema-change-use tool.
+    - `database_execute_nosql_query` — NoSQL query-use tool.
+    - `database_execute_nosql_write_delete` — NoSQL write/delete-use tool.
+- Execution constraints are description-driven: callers must select the right tool from tool/parameter descriptions;
+  the server does not enforce SQL/NoSQL intent via keyword parsing or hardcoded DB-type gating.
 - Settings UI: `Settings | Tools | Database MCP`
 - Auto-start option for the local MCP service
 - Data source scope control: `GLOBAL` / `PROJECT` / `ALL`
@@ -121,30 +121,34 @@ curl -s http://127.0.0.1:8765/mcp \
 # list data sources
 curl -s http://127.0.0.1:8765/mcp \
   -H 'Content-Type: application/json' \
-  -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"database_list_data_sources","arguments":{}}}'
-
-The data source entry returned by `database_list_data_sources` includes a `type` label derived from the JDBC URL or driver metadata. When neither field exposes a recognizable vendor, the value defaults to `Custom`.
+  -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"database_list_datasources","arguments":{}}}'
 ```
 
 ### 4.1) Database listing compatibility
 
-`database_list_databases` relies on JDBC metadata exposed by the IDE data source. Supported engines include both
-mainstream SQL databases and metadata-aware NoSQL connectors:
-
-- **SQL engines:** MySQL, PostgreSQL, Oracle, SQL Server, SQLite, CockroachDB, H2
-- **Metadata-aware NoSQL:** MongoDB, Apache Cassandra, Redis
-
-If a connector is not listed above or it does not expose catalogs/schemas through JDBC metadata, fall back to
-`database_execute_query` to inspect the store manually.
+`database_list_databases` relies on JDBC metadata exposed by the IDE data source. If a connector does not expose
+catalog/schema metadata, use execute tools for manual inspection.
 
 ### 5) Run a SQL example
 
-Replace `YOUR_DS_NAME` with a real data source name from `database_list_data_sources`.
+Replace `YOUR_DS_NAME` with a real data source name from `database_list_datasources`.
 
 ```bash
 curl -s http://127.0.0.1:8765/mcp \
   -H 'Content-Type: application/json' \
-  -d '{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"database_execute_query","arguments":{"dataSource":"YOUR_DS_NAME","sql":"SELECT 1","maxRows":100}}}'
+  -d '{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"database_execute_sql_query","arguments":{"dataSource":"YOUR_DS_NAME","sql":"SELECT 1","maxRows":100}}}'
+```
+
+### 6) Run a NoSQL example
+
+```bash
+curl -s http://127.0.0.1:8765/mcp \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"database_execute_nosql_query","arguments":{"dataSource":"YOUR_DS_NAME","statement":"db.users.find({})","maxRows":100}}}'
+
+curl -s http://127.0.0.1:8765/mcp \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"database_execute_nosql_write_delete","arguments":{"dataSource":"YOUR_DS_NAME","statement":"db.users.deleteMany({inactive:true})"}}}'
 ```
 
 Note: SQL execution uses JDBC connections defined inside the IDE. Credentials are not exported to external storage by

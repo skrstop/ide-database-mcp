@@ -108,6 +108,25 @@ public final class McpProtocolRouter {
                     logInfo("Executed tool " + McpToolDefinitions.TOOL_EXECUTE_SQL_DDL + " on data source: " + dataSource);
                     yield ok(id, mcpToolResult(ddlResult));
                 }
+                case McpToolDefinitions.TOOL_EXECUTE_NOSQL_QUERY -> {
+                    String project = args.has("project") ? args.get("project").getAsString() : "";
+                    String dataSource = requiredString(args, "dataSource");
+                    String statement = requiredString(args, "statement");
+                    int maxRows = args.has("maxRows") ? args.get("maxRows").getAsInt() : 200;
+                    McpSettingsState.DataSourceScope scope = parseScopeArg(args);
+                    Map<String, Object> noSqlQueryResult = databaseFacade.executeNoSqlQuery(project, dataSource, statement, maxRows, scope);
+                    logInfo("Executed tool " + McpToolDefinitions.TOOL_EXECUTE_NOSQL_QUERY + " on data source: " + dataSource);
+                    yield ok(id, mcpToolResult(noSqlQueryResult));
+                }
+                case McpToolDefinitions.TOOL_EXECUTE_NOSQL_WRITE_DELETE -> {
+                    String project = args.has("project") ? args.get("project").getAsString() : "";
+                    String dataSource = requiredString(args, "dataSource");
+                    String statement = requiredString(args, "statement");
+                    McpSettingsState.DataSourceScope scope = parseScopeArg(args);
+                    Map<String, Object> noSqlWriteResult = databaseFacade.executeNoSqlWriteDelete(project, dataSource, statement, scope);
+                    logInfo("Executed tool " + McpToolDefinitions.TOOL_EXECUTE_NOSQL_WRITE_DELETE + " on data source: " + dataSource);
+                    yield ok(id, mcpToolResult(noSqlWriteResult));
+                }
                 default -> error(id, -32602, "Unsupported tool: " + toolName);
             };
         } catch (Exception ex) {
