@@ -6,6 +6,15 @@ README.md）。
 
 ---
 
+## 模块结构
+
+- `ide-database-mcp-base`：`223+` 兼容基础模块，包含本地 HTTP MCP 服务、设置页和数据库桥接能力。
+- `ide-database-mcp-mcpserver-ext`：高版本可选扩展模块，在存在 `com.intellij.mcpServer` 时注册 `mcpToolset`。
+- 根工程：打包聚合模块，负责将以上两个模块组装为一个插件产物。
+
+当 IDE 内存在官方 MCP Server 插件（`com.intellij.mcpServer`）时，可选 `mcpToolset` 会自动加载；当该插件不存在时，本插件仍可通过内置
+`/mcp` 本地服务正常运行。
+
 ## 源起与目的
 
 该插件的目标是让 IDE 内管理的 Database 数据源可以被外部进程/工具通过轻量 HTTP/JSON-RPC MCP 兼容桥接访问，方便自动化工具或代理调用
@@ -33,7 +42,7 @@ IDE 内的数据库能力。
 
 - 基于 IntelliJ Platform 的 JetBrains IDE（`223+`）
 - 目标 IDE 中已安装并启用 `com.intellij.database` 插件
-- Java `17`
+- Java `17`（基础模块）；仅可选 `mcpserver` 扩展模块在编译阶段使用 Java `21`
 - Gradle `9.4.1`（仓库包含 wrapper）
 
 ## 插件安装

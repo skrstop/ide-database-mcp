@@ -15,3 +15,6 @@ pluginManagement {
 }
 
 rootProject.name = "ide-database-mcp"
+
+include(":ide-database-mcp-base")
+include(":ide-database-mcp-mcpserver-ext")

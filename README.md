@@ -9,6 +9,17 @@ If you prefer 中文（Chinese），see the linked translation: [README_zh.md](.
 
 ---
 
+## Module layout
+
+- `ide-database-mcp-base`: compatibility module for `223+`, contains local HTTP MCP server, settings, and database
+  bridge logic.
+- `ide-database-mcp-mcpserver-ext`: optional high-version extension module that contributes `mcpToolset` when
+  `com.intellij.mcpServer` exists.
+- root project: packaging module that assembles both modules into one plugin distribution.
+
+When the IDE provides the official MCP Server plugin (`com.intellij.mcpServer`), the optional `mcpToolset` extension is
+loaded automatically; when it is absent, the plugin still runs with the built-in local `/mcp` service.
+
 ## Source and purpose
 
 This plugin was developed to make IDE-managed Database data sources accessible to external tools through a lightweight
@@ -39,7 +50,7 @@ bundled `com.intellij.database` plugin is available and enabled.
 
 - JetBrains IDE based on IntelliJ Platform `223+`
 - `com.intellij.database` plugin installed and enabled in the target IDE
-- Java `17`
+- Java `17` (base module); Java `21` is used only to compile the optional `mcpserver` extension module.
 - Gradle `9.4.1` (wrapper included)
 
 ## Plugin installation
