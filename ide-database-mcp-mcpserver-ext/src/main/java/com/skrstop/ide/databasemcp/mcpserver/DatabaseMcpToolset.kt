@@ -6,6 +6,7 @@ import com.intellij.mcpserver.annotations.McpDescription
 import com.intellij.mcpserver.annotations.McpTool
 import com.intellij.openapi.project.ProjectManager
 import com.skrstop.ide.databasemcp.db.IdeDatabaseFacade
+import com.skrstop.ide.databasemcp.mcp.McpToolDefinitions
 import com.skrstop.ide.databasemcp.service.McpRuntimeLogService
 import com.skrstop.ide.databasemcp.settings.McpSettingsState
 
@@ -19,58 +20,58 @@ class DatabaseMcpToolset : McpToolset {
         )
     }
 
-    @McpTool(name = "database_list_data_sources")
-    @McpDescription(description = "List available IDE-managed data sources.")
-    suspend fun database_list_data_sources(projectPath: String?, scope: String?): String {
+    @McpTool(name = McpToolDefinitions.TOOL_LIST_DATA_SOURCES)
+    @McpDescription(description = McpToolDefinitions.KT_DESC_LIST_DATA_SOURCES)
+    suspend fun database_list_data_sources(project: String?, scope: String?): String {
         val resolvedScope = parseScope(scope)
-        val result = facade.listDataSources(resolveProjectHint(projectPath), resolvedScope)
+        val result = facade.listDataSources(resolveProjectHint(project), resolvedScope)
         return GSON.toJson(result)
     }
 
-    @McpTool(name = "database_list_databases")
-    @McpDescription(description = "List catalogs/schemas for a selected IDE data source.")
-    suspend fun database_list_databases(dataSource: String, projectPath: String?, scope: String?): String {
+    @McpTool(name = McpToolDefinitions.TOOL_LIST_DATABASES)
+    @McpDescription(description = McpToolDefinitions.KT_DESC_LIST_DATABASES)
+    suspend fun database_list_databases(project: String?, scope: String?, dataSource: String): String {
         requireText(dataSource, "dataSource")
         val resolvedScope = parseScope(scope)
-        val result = facade.listDatabases(resolveProjectHint(projectPath), dataSource, resolvedScope)
+        val result = facade.listDatabases(resolveProjectHint(project), dataSource, resolvedScope)
         return GSON.toJson(result)
     }
 
-    @McpTool(name = "database_execute_query")
-    @McpDescription(description = "Execute read-only SQL query.")
+    @McpTool(name = McpToolDefinitions.TOOL_EXECUTE_QUERY)
+    @McpDescription(description = McpToolDefinitions.KT_DESC_EXECUTE_QUERY)
     suspend fun database_execute_query(
+        project: String?,
+        scope: String?,
         dataSource: String,
         sql: String,
-        maxRows: Int?,
-        projectPath: String?,
-        scope: String?
+        maxRows: Int?
     ): String {
         requireText(dataSource, "dataSource")
         requireText(sql, "sql")
         val resolvedScope = parseScope(scope)
         val effectiveMaxRows = maxRows ?: 200
         val result =
-            facade.executeQuerySql(resolveProjectHint(projectPath), dataSource, sql, effectiveMaxRows, resolvedScope)
+            facade.executeQuerySql(resolveProjectHint(project), dataSource, sql, effectiveMaxRows, resolvedScope)
         return GSON.toJson(result)
     }
 
-    @McpTool(name = "database_execute_dml")
-    @McpDescription(description = "Execute DML SQL statements.")
-    suspend fun database_execute_dml(dataSource: String, sql: String, projectPath: String?, scope: String?): String {
+    @McpTool(name = McpToolDefinitions.TOOL_EXECUTE_DML)
+    @McpDescription(description = McpToolDefinitions.KT_DESC_EXECUTE_DML)
+    suspend fun database_execute_dml(project: String?, scope: String?, dataSource: String, sql: String): String {
         requireText(dataSource, "dataSource")
         requireText(sql, "sql")
         val resolvedScope = parseScope(scope)
-        val result = facade.executeDmlSql(resolveProjectHint(projectPath), dataSource, sql, resolvedScope)
+        val result = facade.executeDmlSql(resolveProjectHint(project), dataSource, sql, resolvedScope)
         return GSON.toJson(result)
     }
 
-    @McpTool(name = "database_execute_ddl")
-    @McpDescription(description = "Execute DDL SQL statements.")
-    suspend fun database_execute_ddl(dataSource: String, sql: String, projectPath: String?, scope: String?): String {
+    @McpTool(name = McpToolDefinitions.TOOL_EXECUTE_DDL)
+    @McpDescription(description = McpToolDefinitions.KT_DESC_EXECUTE_DDL)
+    suspend fun database_execute_ddl(project: String?, scope: String?, dataSource: String, sql: String): String {
         requireText(dataSource, "dataSource")
         requireText(sql, "sql")
         val resolvedScope = parseScope(scope)
-        val result = facade.executeDdlSql(resolveProjectHint(projectPath), dataSource, sql, resolvedScope)
+        val result = facade.executeDdlSql(resolveProjectHint(project), dataSource, sql, resolvedScope)
         return GSON.toJson(result)
     }
 
@@ -100,6 +101,7 @@ class DatabaseMcpToolset : McpToolset {
 
     companion object {
         // 使用 @JvmStatic 或直接引用
+        @JvmStatic
         private val GSON = Gson()
     }
 }

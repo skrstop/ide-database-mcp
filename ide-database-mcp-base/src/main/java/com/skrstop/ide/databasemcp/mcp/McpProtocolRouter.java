@@ -17,11 +17,7 @@ import java.util.Map;
 public final class McpProtocolRouter {
     private static final Gson GSON = new Gson();
     private final IdeDatabaseFacade databaseFacade;
-    private static final String TOOL_LIST_DATA_SOURCES = "database_list_data_sources";
-    private static final String TOOL_LIST_DATABASES = "database_list_databases";
-    private static final String TOOL_EXECUTE_QUERY = "database_execute_query";
-    private static final String TOOL_EXECUTE_DML = "database_execute_dml";
-    private static final String TOOL_EXECUTE_DDL = "database_execute_ddl";
+    // Tool names and metadata are centralized in McpToolDefinitions; use those constants directly where needed.
 
     public McpProtocolRouter(IdeDatabaseFacade databaseFacade) {
         this.databaseFacade = databaseFacade;
@@ -69,47 +65,47 @@ public final class McpProtocolRouter {
 
         try {
             return switch (toolName) {
-                case TOOL_LIST_DATA_SOURCES -> {
+                case McpToolDefinitions.TOOL_LIST_DATA_SOURCES -> {
                     String project = args.has("project") ? args.get("project").getAsString() : "";
                     McpSettingsState.DataSourceScope scope = parseScopeArg(args);
                     List<Map<String, Object>> dataSources = databaseFacade.listDataSources(project, scope);
-                    logInfo("Executed tool " + TOOL_LIST_DATA_SOURCES);
+                    logInfo("Executed tool " + McpToolDefinitions.TOOL_LIST_DATA_SOURCES);
                     yield ok(id, mcpToolResult(dataSources));
                 }
-                case TOOL_LIST_DATABASES -> {
+                case McpToolDefinitions.TOOL_LIST_DATABASES -> {
                     String project = args.has("project") ? args.get("project").getAsString() : "";
                     String dataSource = requiredString(args, "dataSource");
                     McpSettingsState.DataSourceScope scope = parseScopeArg(args);
                     List<Map<String, Object>> databases = databaseFacade.listDatabases(project, dataSource, scope);
-                    logInfo("Executed tool " + TOOL_LIST_DATABASES + " on data source: " + dataSource);
+                    logInfo("Executed tool " + McpToolDefinitions.TOOL_LIST_DATABASES + " on data source: " + dataSource);
                     yield ok(id, mcpToolResult(databases));
                 }
-                case TOOL_EXECUTE_QUERY -> {
+                case McpToolDefinitions.TOOL_EXECUTE_QUERY -> {
                     String project = args.has("project") ? args.get("project").getAsString() : "";
                     String dataSource = requiredString(args, "dataSource");
                     String sql = requiredString(args, "sql");
                     int maxRows = args.has("maxRows") ? args.get("maxRows").getAsInt() : 200;
                     McpSettingsState.DataSourceScope scope = parseScopeArg(args);
                     Map<String, Object> queryResult = databaseFacade.executeQuerySql(project, dataSource, sql, maxRows, scope);
-                    logInfo("Executed tool " + TOOL_EXECUTE_QUERY + " on data source: " + dataSource);
+                    logInfo("Executed tool " + McpToolDefinitions.TOOL_EXECUTE_QUERY + " on data source: " + dataSource);
                     yield ok(id, mcpToolResult(queryResult));
                 }
-                case TOOL_EXECUTE_DML -> {
+                case McpToolDefinitions.TOOL_EXECUTE_DML -> {
                     String project = args.has("project") ? args.get("project").getAsString() : "";
                     String dataSource = requiredString(args, "dataSource");
                     String sql = requiredString(args, "sql");
                     McpSettingsState.DataSourceScope scope = parseScopeArg(args);
                     Map<String, Object> dmlResult = databaseFacade.executeDmlSql(project, dataSource, sql, scope);
-                    logInfo("Executed tool " + TOOL_EXECUTE_DML + " on data source: " + dataSource);
+                    logInfo("Executed tool " + McpToolDefinitions.TOOL_EXECUTE_DML + " on data source: " + dataSource);
                     yield ok(id, mcpToolResult(dmlResult));
                 }
-                case TOOL_EXECUTE_DDL -> {
+                case McpToolDefinitions.TOOL_EXECUTE_DDL -> {
                     String project = args.has("project") ? args.get("project").getAsString() : "";
                     String dataSource = requiredString(args, "dataSource");
                     String sql = requiredString(args, "sql");
                     McpSettingsState.DataSourceScope scope = parseScopeArg(args);
                     Map<String, Object> ddlResult = databaseFacade.executeDdlSql(project, dataSource, sql, scope);
-                    logInfo("Executed tool " + TOOL_EXECUTE_DDL + " on data source: " + dataSource);
+                    logInfo("Executed tool " + McpToolDefinitions.TOOL_EXECUTE_DDL + " on data source: " + dataSource);
                     yield ok(id, mcpToolResult(ddlResult));
                 }
                 default -> error(id, -32602, "Unsupported tool: " + toolName);
@@ -123,167 +119,8 @@ public final class McpProtocolRouter {
     }
 
     private String handleToolsList(JsonElement id) {
-        List<Map<String, Object>> tools = List.of(
-                Map.of(
-                        "name", TOOL_LIST_DATA_SOURCES,
-                        "description", "Discover available IntelliJ Database data sources. Each entry includes name, url, driverClass and a `type` (MySQL, PostgreSQL, MongoDB, etc.) inferred from the JDBC URL/driver. Call this first when you need a valid dataSource name for other database tools.",
-                        "inputSchema", Map.of(
-                                "type", "object",
-                                "properties", Map.of(
-                                        "project", Map.of(
-                                                "type", "string",
-                                                "description", "Optional IntelliJ project name or path hint used to resolve data sources in multi-project IDE sessions.",
-                                                "examples", List.of("ide-database-mcp", "/Users/me/workspace/my-project")
-                                        ),
-                                        "scope", Map.of(
-                                                "type", "string",
-                                                "description", "Optional data source scope filter. GLOBAL = IDE-level shared sources, PROJECT = current project sources, ALL = both. If omitted, plugin default scope is used.",
-                                                "enum", List.of("GLOBAL", "PROJECT", "ALL"),
-                                                "examples", List.of("ALL")
-                                        )
-                                ),
-                                "additionalProperties", false
-                        )
-                ),
-                Map.of(
-                        "name", TOOL_LIST_DATABASES,
-                        "description", "List databases/catalogs/schemas under one IntelliJ-managed data source. Works with SQL engines (MySQL, PostgreSQL, Oracle, SQL Server, SQLite, CockroachDB, H2) and metadata-aware NoSQL connectors (MongoDB, Apache Cassandra, Redis, etc.). When metadata is unavailable fall back to `database_execute_query` for manual inspection.",
-                        "inputSchema", Map.of(
-                                "type", "object",
-                                "properties", Map.of(
-                                        "project", Map.of(
-                                                "type", "string",
-                                                "description", "Optional IntelliJ project name or path hint for disambiguation in multi-project IDE sessions.",
-                                                "examples", List.of("ide-database-mcp", "/Users/me/workspace/my-project")
-                                        ),
-                                        "scope", Map.of(
-                                                "type", "string",
-                                                "description", "Optional data source scope filter. GLOBAL / PROJECT / ALL. If omitted, plugin default scope is used.",
-                                                "enum", List.of("GLOBAL", "PROJECT", "ALL"),
-                                                "examples", List.of("ALL")
-                                        ),
-                                        "dataSource", Map.of(
-                                                "type", "string",
-                                                "description", "Exact data source name returned by database_list_data_sources.",
-                                                "minLength", 1,
-                                                "examples", List.of("Local MySQL", "PostgreSQL-Prod")
-                                        )
-                                ),
-                                "required", List.of("dataSource"),
-                                "additionalProperties", false
-                        )
-                ),
-                Map.of(
-                        "name", TOOL_EXECUTE_QUERY,
-                        "description", "Execute a read-only SQL SELECT/CTE query and return rows. Use for retrieval only; avoid DML/DDL statements.",
-                        "inputSchema", Map.of(
-                                "type", "object",
-                                "properties", Map.of(
-                                        "project", Map.of(
-                                                "type", "string",
-                                                "description", "Optional IntelliJ project name or path hint for data source resolution.",
-                                                "examples", List.of("ide-database-mcp", "/Users/me/workspace/my-project")
-                                        ),
-                                        "scope", Map.of(
-                                                "type", "string",
-                                                "description", "Optional data source scope filter. GLOBAL / PROJECT / ALL. If omitted, plugin default scope is used.",
-                                                "enum", List.of("GLOBAL", "PROJECT", "ALL"),
-                                                "examples", List.of("ALL")
-                                        ),
-                                        "dataSource", Map.of(
-                                                "type", "string",
-                                                "description", "Exact data source name returned by database_list_data_sources.",
-                                                "minLength", 1,
-                                                "examples", List.of("Local MySQL", "PostgreSQL-Prod")
-                                        ),
-                                        "sql", Map.of(
-                                                "type", "string",
-                                                "description", "Read-only SQL (typically SELECT/WITH). Do not pass INSERT/UPDATE/DELETE/CREATE/ALTER/DROP here.",
-                                                "minLength", 1,
-                                                "examples", List.of("SELECT id, name FROM users ORDER BY id DESC LIMIT 20")
-                                        ),
-                                        "maxRows", Map.of(
-                                                "type", "integer",
-                                                "description", "Maximum number of rows to return. Smaller values improve latency. Default: 200.",
-                                                "minimum", 1,
-                                                "maximum", 10000,
-                                                "default", 200,
-                                                "examples", List.of(100, 500)
-                                        )
-                                ),
-                                "required", List.of("dataSource", "sql"),
-                                "additionalProperties", false
-                        )
-                ),
-                Map.of(
-                        "name", TOOL_EXECUTE_DML,
-                        "description", "Execute data-changing DML SQL (INSERT/UPDATE/DELETE/MERGE/REPLACE). Use when you need to modify existing data.",
-                        "inputSchema", Map.of(
-                                "type", "object",
-                                "properties", Map.of(
-                                        "project", Map.of(
-                                                "type", "string",
-                                                "description", "Optional IntelliJ project name or path hint for data source resolution.",
-                                                "examples", List.of("ide-database-mcp", "/Users/me/workspace/my-project")
-                                        ),
-                                        "scope", Map.of(
-                                                "type", "string",
-                                                "description", "Optional data source scope filter. GLOBAL / PROJECT / ALL. If omitted, plugin default scope is used.",
-                                                "enum", List.of("GLOBAL", "PROJECT", "ALL"),
-                                                "examples", List.of("ALL")
-                                        ),
-                                        "dataSource", Map.of(
-                                                "type", "string",
-                                                "description", "Exact data source name returned by database_list_data_sources.",
-                                                "minLength", 1,
-                                                "examples", List.of("Local MySQL", "PostgreSQL-Prod")
-                                        ),
-                                        "sql", Map.of(
-                                                "type", "string",
-                                                "description", "DML SQL statement such as INSERT/UPDATE/DELETE/MERGE/REPLACE.",
-                                                "minLength", 1,
-                                                "examples", List.of("UPDATE users SET status = 'ACTIVE' WHERE id = 1001")
-                                        )
-                                ),
-                                "required", List.of("dataSource", "sql"),
-                                "additionalProperties", false
-                        )
-                ),
-                Map.of(
-                        "name", TOOL_EXECUTE_DDL,
-                        "description", "Execute schema-changing DDL SQL (CREATE/ALTER/DROP/TRUNCATE/RENAME/COMMENT). Use for database structure changes.",
-                        "inputSchema", Map.of(
-                                "type", "object",
-                                "properties", Map.of(
-                                        "project", Map.of(
-                                                "type", "string",
-                                                "description", "Optional IntelliJ project name or path hint for data source resolution.",
-                                                "examples", List.of("ide-database-mcp", "/Users/me/workspace/my-project")
-                                        ),
-                                        "scope", Map.of(
-                                                "type", "string",
-                                                "description", "Optional data source scope filter. GLOBAL / PROJECT / ALL. If omitted, plugin default scope is used.",
-                                                "enum", List.of("GLOBAL", "PROJECT", "ALL"),
-                                                "examples", List.of("ALL")
-                                        ),
-                                        "dataSource", Map.of(
-                                                "type", "string",
-                                                "description", "Exact data source name returned by database_list_data_sources.",
-                                                "minLength", 1,
-                                                "examples", List.of("Local MySQL", "PostgreSQL-Prod")
-                                        ),
-                                        "sql", Map.of(
-                                                "type", "string",
-                                                "description", "DDL SQL statement such as CREATE/ALTER/DROP/TRUNCATE/RENAME/COMMENT.",
-                                                "minLength", 1,
-                                                "examples", List.of("ALTER TABLE users ADD COLUMN last_login TIMESTAMP NULL")
-                                        )
-                                ),
-                                "required", List.of("dataSource", "sql"),
-                                "additionalProperties", false
-                        )
-                )
-        );
+        // Delegate to centralized definitions
+        List<Map<String, Object>> tools = McpToolDefinitions.getTools();
 
         recordToolsListUsage(tools);
         return ok(id, Map.of("tools", tools));

@@ -2,6 +2,7 @@ package com.skrstop.ide.databasemcp.service;
 
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.components.Service;
+import com.skrstop.ide.databasemcp.mcp.McpToolDefinitions;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -11,11 +12,11 @@ import java.util.concurrent.atomic.AtomicLong;
 @Service(Service.Level.APP)
 public final class McpMethodMetricsService {
     private static final List<String> KNOWN_METHOD_KEYS = List.of(
-            "tool:database_list_data_sources",
-            "tool:database_list_databases",
-            "tool:database_execute_query",
-            "tool:database_execute_dml",
-            "tool:database_execute_ddl",
+            "tool:" + McpToolDefinitions.TOOL_LIST_DATABASES,
+            "tool:" + McpToolDefinitions.TOOL_LIST_DATABASES,
+            "tool:" + McpToolDefinitions.TOOL_EXECUTE_QUERY,
+            "tool:" + McpToolDefinitions.TOOL_EXECUTE_DML,
+            "tool:" + McpToolDefinitions.TOOL_EXECUTE_DDL,
             "rpc:unknown",
             "rpc:initialize",
             "rpc:tools/list",
