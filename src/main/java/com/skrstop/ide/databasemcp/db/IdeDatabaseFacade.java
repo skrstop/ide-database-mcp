@@ -44,6 +44,12 @@ public class IdeDatabaseFacade {
             "com.intellij.database.dataSource.DataSourceModelStorageImpl$App"
     );
 
+    private static final String CUSTOM_DATA_SOURCE_TYPE = "Custom";
+    private static final Set<String> DRIVER_SEGMENT_BLACKLIST = Set.of(
+            "com", "org", "net", "io", "www", "jdbc", "drivers", "driver", "database", "thin",
+            "data", "datasource", "access", "connection"
+    );
+
     public List<Map<String, Object>> listDataSources(String projectHint) {
         return listDataSources(projectHint, null);
     }
@@ -69,9 +75,13 @@ public class IdeDatabaseFacade {
         for (ScopedDataSource scoped : scopedDataSources) {
             Object ds = scoped.delegate;
             Map<String, Object> row = new HashMap<>();
-            row.put("name", invokeString(ds, "getName"));
-            row.put("url", invokeString(ds, "getUrl"));
-            row.put("driverClass", invokeString(ds, "getDriverClass"));
+            String name = invokeString(ds, "getName");
+            String url = invokeString(ds, "getUrl");
+            String driver = invokeString(ds, "getDriverClass");
+            row.put("name", name);
+            row.put("url", url);
+            row.put("driverClass", driver);
+            row.put("type", inferDataSourceType(url, driver));
             row.put("scope", scoped.scope.name());
             result.add(row);
         }
@@ -347,6 +357,153 @@ public class IdeDatabaseFacade {
         }
         String url = invokeString(dataSource, "getUrl");
         return "url:" + (url == null ? String.valueOf(System.identityHashCode(dataSource)) : url);
+    }
+
+    private String inferDataSourceType(String url, String driverClass) {
+        String vendor = formatVendorName(extractVendorFromUrl(url));
+        if (vendor == null) {
+            vendor = formatVendorName(extractVendorFromDriverClass(driverClass));
+        }
+        return vendor == null ? CUSTOM_DATA_SOURCE_TYPE : vendor;
+    }
+
+    private String extractVendorFromUrl(String url) {
+        if (url == null) {
+            return null;
+        }
+        String normalized = url.toLowerCase(Locale.ROOT).trim();
+        if (normalized.isBlank()) {
+            return null;
+        }
+        int offset = 0;
+        if (normalized.startsWith("jdbc:")) {
+            offset = 5;
+        }
+        if (offset >= normalized.length()) {
+            return null;
+        }
+        String remainder = normalized.substring(offset);
+        if (remainder.isBlank()) {
+            return null;
+        }
+        int delimiter = firstDelimiterIndex(remainder);
+        return delimiter < 0 ? remainder : remainder.substring(0, delimiter);
+    }
+
+    private int firstDelimiterIndex(String value) {
+        int idx = value.indexOf(':');
+        int slash = value.indexOf('/');
+        int semicolon = value.indexOf(';');
+        int question = value.indexOf('?');
+        int at = value.indexOf('@');
+        int end = value.length();
+        if (idx >= 0) {
+            end = Math.min(end, idx);
+        }
+        if (slash >= 0) {
+            end = Math.min(end, slash);
+        }
+        if (semicolon >= 0) {
+            end = Math.min(end, semicolon);
+        }
+        if (question >= 0) {
+            end = Math.min(end, question);
+        }
+        if (at >= 0) {
+            end = Math.min(end, at);
+        }
+        return end == value.length() ? -1 : end;
+    }
+
+    private String extractVendorFromDriverClass(String driverClass) {
+        if (driverClass == null || driverClass.isBlank()) {
+            return null;
+        }
+        String normalized = driverClass.toLowerCase(Locale.ROOT);
+        String[] segments = normalized.split("[^a-z0-9]+");
+        if (segments.length == 0) {
+            return null;
+        }
+        for (String segment : segments) {
+            if (isSkippableDriverSegment(segment)) {
+                continue;
+            }
+            if (segment.contains("sql")) {
+                return segment;
+            }
+        }
+        for (String segment : segments) {
+            if (!isSkippableDriverSegment(segment)) {
+                return segment;
+            }
+        }
+        return null;
+    }
+
+    private boolean isSkippableDriverSegment(String segment) {
+        if (segment == null || segment.isBlank()) {
+            return true;
+        }
+        return DRIVER_SEGMENT_BLACKLIST.contains(segment);
+    }
+
+    private String formatVendorName(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        String normalized = raw.replaceAll("[^a-z0-9]+", " ").trim().toLowerCase(Locale.ROOT);
+        if (normalized.isBlank()) {
+            return null;
+        }
+        String[] words = normalized.split("\\s+");
+        List<String> formatted = new ArrayList<>();
+        for (String word : words) {
+            String part = formatVendorWord(word);
+            if (part != null) {
+                formatted.add(part);
+            }
+        }
+        if (formatted.isEmpty()) {
+            return null;
+        }
+        return String.join(" ", formatted);
+    }
+
+    private String formatVendorWord(String word) {
+        if (word == null || word.isBlank()) {
+            return null;
+        }
+        switch (word) {
+            case "mongodb":
+                return "MongoDB";
+            case "redis":
+                return "Redis";
+            case "cassandra":
+                return "Cassandra";
+            case "cockroach":
+                return "CockroachDB";
+            case "db2":
+                return "DB2";
+            case "h2":
+                return "H2";
+            case "sqlite":
+                return "SQLite";
+        }
+        if (word.endsWith("sql") && word.length() > 3) {
+            String prefix = word.substring(0, word.length() - 3);
+            return capitalize(prefix) + "SQL";
+        }
+        return capitalize(word);
+    }
+
+    private String capitalize(String input) {
+        if (input == null || input.isBlank()) {
+            return input;
+        }
+        if (input.length() == 1) {
+            return input.toUpperCase(Locale.ROOT);
+        }
+        return input.substring(0, 1).toUpperCase(Locale.ROOT) + input.substring(1).toLowerCase(Locale.ROOT);
     }
 
     private DiscoveryResult discoverDataSources(List<String> managerClassCandidates,

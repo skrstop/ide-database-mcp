@@ -11,11 +11,11 @@ import java.util.concurrent.atomic.AtomicLong;
 @Service(Service.Level.APP)
 public final class McpMethodMetricsService {
     private static final List<String> KNOWN_METHOD_KEYS = List.of(
-            "tool:db.listDataSources",
-            "tool:db.listDatabases",
-            "tool:db.executeQuery",
-            "tool:db.executeDml",
-            "tool:db.executeDdl",
+            "tool:database.list_data_sources",
+            "tool:database.list_databases",
+            "tool:database.execute_query",
+            "tool:database.execute_dml",
+            "tool:database.execute_ddl",
             "rpc:unknown",
             "rpc:initialize",
             "rpc:tools/list",

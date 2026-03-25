@@ -21,11 +21,15 @@ bundled `com.intellij.database` plugin is available and enabled.
 ## Key features
 
 - Exposes Database capabilities as MCP tools:
-    - `db.listDataSources` — list configured data sources
-    - `db.listDatabases` — list catalogs/schemas in one data source
-    - `db.executeQuery` — execute read-only SQL
-    - `db.executeDml` — execute DML statements
-    - `db.executeDdl` — execute DDL statements
+    - `database.list_data_sources` — list configured data sources. Each item includes the inferred `type` label (MySQL,
+      PostgreSQL, MongoDB, etc.) derived from the JDBC URL/driver so the client understands the flavor of the
+      connection; when neither field identifies a recognizable vendor the tool reports `type` as `Custom`.
+    - `database.list_databases` — list catalogs/schemas in one data source. Works with mainstream SQL engines (MySQL,
+      PostgreSQL, Oracle, SQL Server, SQLite, CockroachDB, H2) and metadata-aware NoSQL connectors (MongoDB, Apache
+      Cassandra, Redis, etc.). When metadata is missing fall back to `database.execute_query` for manual inspection.
+    - `database.execute_query` — execute read-only SQL
+    - `database.execute_dml` — execute DML statements
+    - `database.execute_ddl` — execute DDL statements
 - Settings UI: `Settings | Tools | Database MCP`
 - Auto-start option for the local MCP service
 - Data source scope control: `GLOBAL` / `PROJECT` / `ALL`
@@ -106,17 +110,30 @@ curl -s http://127.0.0.1:8765/mcp \
 # list data sources
 curl -s http://127.0.0.1:8765/mcp \
   -H 'Content-Type: application/json' \
-  -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"db.listDataSources","arguments":{}}}'
+  -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"database.list_data_sources","arguments":{}}}'
+
+The data source entry returned by `database.list_data_sources` includes a `type` label derived from the JDBC URL or driver metadata. When neither field exposes a recognizable vendor, the value defaults to `Custom`.
 ```
+
+### 4.1) Database listing compatibility
+
+`database.list_databases` relies on JDBC metadata exposed by the IDE data source. Supported engines include both
+mainstream SQL databases and metadata-aware NoSQL connectors:
+
+- **SQL engines:** MySQL, PostgreSQL, Oracle, SQL Server, SQLite, CockroachDB, H2
+- **Metadata-aware NoSQL:** MongoDB, Apache Cassandra, Redis
+
+If a connector is not listed above or it does not expose catalogs/schemas through JDBC metadata, fall back to
+`database.execute_query` to inspect the store manually.
 
 ### 5) Run a SQL example
 
-Replace `YOUR_DS_NAME` with a real data source name from `db.listDataSources`.
+Replace `YOUR_DS_NAME` with a real data source name from `database.list_data_sources`.
 
 ```bash
 curl -s http://127.0.0.1:8765/mcp \
   -H 'Content-Type: application/json' \
-  -d '{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"db.executeQuery","arguments":{"dataSource":"YOUR_DS_NAME","sql":"SELECT 1","maxRows":100}}}'
+  -d '{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"database.execute_query","arguments":{"dataSource":"YOUR_DS_NAME","sql":"SELECT 1","maxRows":100}}}'
 ```
 
 Note: SQL execution uses JDBC connections defined inside the IDE. Credentials are not exported to external storage by

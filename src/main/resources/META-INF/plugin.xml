@@ -8,12 +8,15 @@
 
         <p><b>Tool list (tools/list)</b></p>
         <ul>
-            <li><code>db.listDataSources</code>: list available IDE-managed data sources.</li>
-            <li><code>db.listDatabases</code>: list databases/catalogs/schemas under a selected data source.</li>
-            <li><code>db.executeQuery</code>: execute read-only query SQL (<code>SELECT</code>/<code>WITH</code>).</li>
-            <li><code>db.executeDml</code>: execute data-changing SQL (<code>INSERT</code>/<code>UPDATE</code>/<code>DELETE</code>/<code>MERGE</code>/<code>REPLACE</code>).</li>
-            <li><code>db.executeDdl</code>: execute schema-changing SQL (<code>CREATE</code>/<code>ALTER</code>/<code>DROP</code>/<code>TRUNCATE</code>/<code>RENAME</code>/<code>COMMENT</code>).</li>
+            <li><code>database.list_data_sources</code>: list available IDE-managed data sources with name, url, driverClass and an inferred <code>type</code>.</li>
+            <li><code>database.list_databases</code>: list databases/catalogs/schemas under a selected data source.</li>
+            <li><code>database.execute_query</code>: execute read-only query SQL (<code>SELECT</code>/<code>WITH</code>).</li>
+            <li><code>database.execute_dml</code>: execute data-changing SQL (<code>INSERT</code>/<code>UPDATE</code>/<code>DELETE</code>/<code>MERGE</code>/<code>REPLACE</code>).</li>
+            <li><code>database.execute_ddl</code>: execute schema-changing SQL (<code>CREATE</code>/<code>ALTER</code>/<code>DROP</code>/<code>TRUNCATE</code>/<code>RENAME</code>/<code>COMMENT</code>).</li>
         </ul>
+
+        <p><b>Database coverage</b>: <code>database.list_databases</code> works for major SQL engines (MySQL, PostgreSQL, Oracle, SQL Server, SQLite, CockroachDB, H2) and metadata-aware NoSQL connectors (MongoDB, Apache Cassandra, Redis, etc.). When metadata is missing you can still inspect the store with <code>database.execute_query</code>.</p>
+        <p><b>Data source metadata</b>: entries returned by <code>database.list_data_sources</code> include a <code>type</code> label derived from the JDBC URL/driver (falls back to Custom) so clients know if they are talking to MySQL, PostgreSQL, MongoDB, etc.</p>
 
         <p><b>SQL capability</b>: This plugin supports query, DML, and DDL tools. Actual execution is determined by your database account permissions and data source privileges.</p>
         <p><b>Requirement</b>: The JetBrains Database Tools plugin is required and must be available (<code>com.intellij.database</code>).</p>
@@ -26,12 +29,15 @@
 
         <p><b>工具列表（tools/list）</b></p>
         <ul>
-            <li><code>db.listDataSources</code>：列出 IDE 管理的数据源。</li>
-            <li><code>db.listDatabases</code>：列出指定数据源下的数据库、catalog 和 schema。</li>
-            <li><code>db.executeQuery</code>：执行只读查询 SQL（<code>SELECT</code>/<code>WITH</code>）。</li>
-            <li><code>db.executeDml</code>：执行数据变更 SQL（<code>INSERT</code>/<code>UPDATE</code>/<code>DELETE</code>/<code>MERGE</code>/<code>REPLACE</code>）。</li>
-            <li><code>db.executeDdl</code>：执行结构变更 SQL（<code>CREATE</code>/<code>ALTER</code>/<code>DROP</code>/<code>TRUNCATE</code>/<code>RENAME</code>/<code>COMMENT</code>）。</li>
+            <li><code>database.list_data_sources</code>：列出 IDE 管理的数据源，返回包括名称、地址、驱动类和推断的 <code>type</code>。</li>
+            <li><code>database.list_databases</code>：列出指定数据源下的数据库、catalog 和 schema。</li>
+            <li><code>database.execute_query</code>：执行只读查询 SQL（<code>SELECT</code>/<code>WITH</code>）。</li>
+            <li><code>database.execute_dml</code>：执行数据变更 SQL（<code>INSERT</code>/<code>UPDATE</code>/<code>DELETE</code>/<code>MERGE</code>/<code>REPLACE</code>）。</li>
+            <li><code>database.execute_ddl</code>：执行结构变更 SQL（<code>CREATE</code>/<code>ALTER</code>/<code>DROP</code>/<code>TRUNCATE</code>/<code>RENAME</code>/<code>COMMENT</code>）。</li>
         </ul>
+
+        <p><b>数据库兼容性</b>：<code>database.list_databases</code> 兼容主流 SQL 引擎（MySQL、PostgreSQL、Oracle、SQL Server、SQLite、CockroachDB、H2）以及暴露元数据的 NoSQL 连接（MongoDB、Apache Cassandra、Redis 等）；当元数据不可用时，可以使用 <code>database.execute_query</code> 手动探查。</p>
+        <p><b>数据源元信息</b>：<code>database.list_data_sources</code> 会在返回项中附带根据 JDBC URL/Driver 推断的 <code>type</code> 标签，无法识别时默认 Custom，方便客户端区分 MySQL、PostgreSQL、MongoDB 等。</p>
 
         <p><b>SQL 能力说明</b>：本插件支持查询、DML、DDL 三类 SQL 工具；是否可实际执行取决于你的数据库账号权限和数据源权限。</p>
         <p><b>依赖要求</b>：必须安装并可用 JetBrains Database Tools 插件（<code>com.intellij.database</code>）。</p>
