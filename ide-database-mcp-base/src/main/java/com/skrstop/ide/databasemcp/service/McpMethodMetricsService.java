@@ -14,9 +14,9 @@ public final class McpMethodMetricsService {
     private static final List<String> KNOWN_METHOD_KEYS = List.of(
             "tool:" + McpToolDefinitions.TOOL_LIST_DATABASES,
             "tool:" + McpToolDefinitions.TOOL_LIST_DATABASES,
-            "tool:" + McpToolDefinitions.TOOL_EXECUTE_QUERY,
-            "tool:" + McpToolDefinitions.TOOL_EXECUTE_DML,
-            "tool:" + McpToolDefinitions.TOOL_EXECUTE_DDL,
+            "tool:" + McpToolDefinitions.TOOL_EXECUTE_SQL_QUERY,
+            "tool:" + McpToolDefinitions.TOOL_EXECUTE_SQL_DML,
+            "tool:" + McpToolDefinitions.TOOL_EXECUTE_SQL_DDL,
             "rpc:unknown",
             "rpc:initialize",
             "rpc:tools/list",

@@ -65,11 +65,11 @@ public final class McpProtocolRouter {
 
         try {
             return switch (toolName) {
-                case McpToolDefinitions.TOOL_LIST_DATA_SOURCES -> {
+                case McpToolDefinitions.TOOL_LIST_DATASOURCES -> {
                     String project = args.has("project") ? args.get("project").getAsString() : "";
                     McpSettingsState.DataSourceScope scope = parseScopeArg(args);
                     List<Map<String, Object>> dataSources = databaseFacade.listDataSources(project, scope);
-                    logInfo("Executed tool " + McpToolDefinitions.TOOL_LIST_DATA_SOURCES);
+                    logInfo("Executed tool " + McpToolDefinitions.TOOL_LIST_DATASOURCES);
                     yield ok(id, mcpToolResult(dataSources));
                 }
                 case McpToolDefinitions.TOOL_LIST_DATABASES -> {
@@ -80,32 +80,32 @@ public final class McpProtocolRouter {
                     logInfo("Executed tool " + McpToolDefinitions.TOOL_LIST_DATABASES + " on data source: " + dataSource);
                     yield ok(id, mcpToolResult(databases));
                 }
-                case McpToolDefinitions.TOOL_EXECUTE_QUERY -> {
+                case McpToolDefinitions.TOOL_EXECUTE_SQL_QUERY -> {
                     String project = args.has("project") ? args.get("project").getAsString() : "";
                     String dataSource = requiredString(args, "dataSource");
                     String sql = requiredString(args, "sql");
                     int maxRows = args.has("maxRows") ? args.get("maxRows").getAsInt() : 200;
                     McpSettingsState.DataSourceScope scope = parseScopeArg(args);
                     Map<String, Object> queryResult = databaseFacade.executeQuerySql(project, dataSource, sql, maxRows, scope);
-                    logInfo("Executed tool " + McpToolDefinitions.TOOL_EXECUTE_QUERY + " on data source: " + dataSource);
+                    logInfo("Executed tool " + McpToolDefinitions.TOOL_EXECUTE_SQL_QUERY + " on data source: " + dataSource);
                     yield ok(id, mcpToolResult(queryResult));
                 }
-                case McpToolDefinitions.TOOL_EXECUTE_DML -> {
+                case McpToolDefinitions.TOOL_EXECUTE_SQL_DML -> {
                     String project = args.has("project") ? args.get("project").getAsString() : "";
                     String dataSource = requiredString(args, "dataSource");
                     String sql = requiredString(args, "sql");
                     McpSettingsState.DataSourceScope scope = parseScopeArg(args);
                     Map<String, Object> dmlResult = databaseFacade.executeDmlSql(project, dataSource, sql, scope);
-                    logInfo("Executed tool " + McpToolDefinitions.TOOL_EXECUTE_DML + " on data source: " + dataSource);
+                    logInfo("Executed tool " + McpToolDefinitions.TOOL_EXECUTE_SQL_DML + " on data source: " + dataSource);
                     yield ok(id, mcpToolResult(dmlResult));
                 }
-                case McpToolDefinitions.TOOL_EXECUTE_DDL -> {
+                case McpToolDefinitions.TOOL_EXECUTE_SQL_DDL -> {
                     String project = args.has("project") ? args.get("project").getAsString() : "";
                     String dataSource = requiredString(args, "dataSource");
                     String sql = requiredString(args, "sql");
                     McpSettingsState.DataSourceScope scope = parseScopeArg(args);
                     Map<String, Object> ddlResult = databaseFacade.executeDdlSql(project, dataSource, sql, scope);
-                    logInfo("Executed tool " + McpToolDefinitions.TOOL_EXECUTE_DDL + " on data source: " + dataSource);
+                    logInfo("Executed tool " + McpToolDefinitions.TOOL_EXECUTE_SQL_DDL + " on data source: " + dataSource);
                     yield ok(id, mcpToolResult(ddlResult));
                 }
                 default -> error(id, -32602, "Unsupported tool: " + toolName);

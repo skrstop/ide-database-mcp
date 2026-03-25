@@ -11,11 +11,11 @@ import java.util.Map;
 public final class McpToolDefinitions {
     private McpToolDefinitions() {}
 
-    public static final String TOOL_LIST_DATA_SOURCES = "database_list_data_sources";
+    public static final String TOOL_LIST_DATASOURCES = "database_list_datasources";
     public static final String TOOL_LIST_DATABASES = "database_list_databases";
-    public static final String TOOL_EXECUTE_QUERY = "database_execute_query";
-    public static final String TOOL_EXECUTE_DML = "database_execute_dml";
-    public static final String TOOL_EXECUTE_DDL = "database_execute_ddl";
+    public static final String TOOL_EXECUTE_SQL_QUERY = "database_execute_sql_query";
+    public static final String TOOL_EXECUTE_SQL_DML = "database_execute_sql_dml";
+    public static final String TOOL_EXECUTE_SQL_DDL = "database_execute_sql_ddl";
 
 
     public static final String DESC_LIST_DATA_SOURCES =
@@ -52,7 +52,7 @@ public final class McpToolDefinitions {
             "Maximum number of rows to return. Smaller values improve latency. Default: 200.";
 
 
-    public static final String KT_DESC_LIST_DATA_SOURCES =
+    public static final String KT_DESC_LIST_DATASOURCES =
             DESC_LIST_DATA_SOURCES +
                     "\n\n" +
                     "Parameters:\n" +
@@ -67,7 +67,7 @@ public final class McpToolDefinitions {
                     "- scope (optional): " + PARAM_SCOPE_DESC_SHORT + "\n" +
                     "- dataSource (required): " + PARAM_DATASOURCE_DESC;
 
-    public static final String KT_DESC_EXECUTE_QUERY =
+    public static final String KT_DESC_EXECUTE_SQL_QUERY =
             DESC_EXECUTE_QUERY +
                     "\n\n" +
                     "Parameters:\n" +
@@ -77,7 +77,7 @@ public final class McpToolDefinitions {
                     "- sql (required): " + PARAM_SQL_READONLY_DESC + "\n" +
                     "- maxRows (optional): " + PARAM_MAXROWS_DESC;
 
-    public static final String KT_DESC_EXECUTE_DML =
+    public static final String KT_DESC_EXECUTE_SQL_DML =
             DESC_EXECUTE_DML +
                     "\n\n" +
                     "Parameters:\n" +
@@ -86,7 +86,7 @@ public final class McpToolDefinitions {
                     "- dataSource (required): " + PARAM_DATASOURCE_DESC + "\n" +
                     "- sql (required): " + PARAM_SQL_DML_DESC;
 
-    public static final String KT_DESC_EXECUTE_DDL =
+    public static final String KT_DESC_EXECUTE_SQL_DDL =
             DESC_EXECUTE_DDL +
                     "\n\n" +
                     "Parameters:\n" +
@@ -99,7 +99,7 @@ public final class McpToolDefinitions {
     public static List<Map<String, Object>> getTools() {
         return List.of(
                 Map.of(
-                        "name", TOOL_LIST_DATA_SOURCES,
+                        "name", TOOL_LIST_DATASOURCES,
                         "description", DESC_LIST_DATA_SOURCES,
                         "inputSchema", Map.of(
                                 "type", "object",
@@ -148,7 +148,7 @@ public final class McpToolDefinitions {
                         )
                 ),
                 Map.of(
-                        "name", TOOL_EXECUTE_QUERY,
+                        "name", TOOL_EXECUTE_SQL_QUERY,
                         "description", DESC_EXECUTE_QUERY,
                         "inputSchema", Map.of(
                                 "type", "object",
@@ -190,7 +190,7 @@ public final class McpToolDefinitions {
                         )
                 ),
                 Map.of(
-                        "name", TOOL_EXECUTE_DML,
+                        "name", TOOL_EXECUTE_SQL_DML,
                         "description", DESC_EXECUTE_DML,
                         "inputSchema", Map.of(
                                 "type", "object",
@@ -224,7 +224,7 @@ public final class McpToolDefinitions {
                         )
                 ),
                 Map.of(
-                        "name", TOOL_EXECUTE_DDL,
+                        "name", TOOL_EXECUTE_SQL_DDL,
                         "description", DESC_EXECUTE_DDL,
                         "inputSchema", Map.of(
                                 "type", "object",
