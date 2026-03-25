@@ -22,7 +22,7 @@ class DatabaseMcpToolset : McpToolset {
 
     @McpTool(name = McpToolDefinitions.TOOL_LIST_DATASOURCES)
     @McpDescription(description = McpToolDefinitions.KT_DESC_LIST_DATASOURCES)
-    suspend fun database_list_data_sources(project: String?, scope: String?): String {
+    suspend fun database_list_datasources(project: String?, scope: String?): String {
         val resolvedScope = parseScope(scope)
         val result = facade.listDataSources(resolveProjectHint(project), resolvedScope)
         return GSON.toJson(result)
@@ -39,7 +39,7 @@ class DatabaseMcpToolset : McpToolset {
 
     @McpTool(name = McpToolDefinitions.TOOL_EXECUTE_SQL_QUERY)
     @McpDescription(description = McpToolDefinitions.KT_DESC_EXECUTE_SQL_QUERY)
-    suspend fun database_execute_query(
+    suspend fun database_execute_sql_query(
         project: String?,
         scope: String?,
         dataSource: String,
@@ -57,7 +57,7 @@ class DatabaseMcpToolset : McpToolset {
 
     @McpTool(name = McpToolDefinitions.TOOL_EXECUTE_SQL_DML)
     @McpDescription(description = McpToolDefinitions.KT_DESC_EXECUTE_SQL_DML)
-    suspend fun database_execute_dml(project: String?, scope: String?, dataSource: String, sql: String): String {
+    suspend fun database_execute_sql_dml(project: String?, scope: String?, dataSource: String, sql: String): String {
         requireText(dataSource, "dataSource")
         requireText(sql, "sql")
         val resolvedScope = parseScope(scope)
@@ -67,7 +67,7 @@ class DatabaseMcpToolset : McpToolset {
 
     @McpTool(name = McpToolDefinitions.TOOL_EXECUTE_SQL_DDL)
     @McpDescription(description = McpToolDefinitions.KT_DESC_EXECUTE_SQL_DDL)
-    suspend fun database_execute_ddl(project: String?, scope: String?, dataSource: String, sql: String): String {
+    suspend fun database_execute_sql_ddl(project: String?, scope: String?, dataSource: String, sql: String): String {
         requireText(dataSource, "dataSource")
         requireText(sql, "sql")
         val resolvedScope = parseScope(scope)
