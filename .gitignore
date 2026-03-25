@@ -6,6 +6,7 @@ out/
 # Gradle
 .gradle/
 .gradle/**
+.kotlin/**
 build/
 
 # Logs
