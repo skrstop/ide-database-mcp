@@ -50,7 +50,7 @@
 
     <depends>com.intellij.modules.platform</depends>
     <depends>com.intellij.database</depends>
-    <depends optional="true" config-file="mcpserver-integration.xml">com.intellij.mcpServer</depends>
+    <depends-mcp-server/>
 
     <extensions defaultExtensionNs="com.intellij">
         <applicationConfigurable
