@@ -14,6 +14,7 @@ public final class McpMethodMetricsService {
     private static final List<String> KNOWN_METHOD_KEYS = List.of(
             "tool:" + McpToolDefinitions.TOOL_LIST_DATASOURCES,
             "tool:" + McpToolDefinitions.TOOL_LIST_DATABASES,
+            "tool:" + McpToolDefinitions.TOOL_LIST_TABLE_SCHEMA,
             "tool:" + McpToolDefinitions.TOOL_EXECUTE_SQL_QUERY,
             "tool:" + McpToolDefinitions.TOOL_EXECUTE_SQL_DML,
             "tool:" + McpToolDefinitions.TOOL_EXECUTE_SQL_DDL,

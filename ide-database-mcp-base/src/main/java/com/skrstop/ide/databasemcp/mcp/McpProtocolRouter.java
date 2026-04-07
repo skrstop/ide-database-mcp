@@ -1,15 +1,13 @@
 package com.skrstop.ide.databasemcp.mcp;
 
-import com.google.gson.Gson;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
+import com.google.gson.*;
 import com.intellij.openapi.application.ApplicationManager;
 import com.skrstop.ide.databasemcp.db.IdeDatabaseFacade;
 import com.skrstop.ide.databasemcp.service.McpMethodMetricsService;
 import com.skrstop.ide.databasemcp.service.McpRuntimeLogService;
 import com.skrstop.ide.databasemcp.settings.McpSettingsState;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -127,6 +125,23 @@ public final class McpProtocolRouter {
                     logInfo("Executed tool " + McpToolDefinitions.TOOL_EXECUTE_NOSQL_WRITE_DELETE + " on data source: " + dataSource);
                     yield ok(id, mcpToolResult(noSqlWriteResult));
                 }
+                case McpToolDefinitions.TOOL_LIST_TABLE_SCHEMA -> {
+                    String project = args.has("project") ? args.get("project").getAsString() : "";
+                    String dataSource = requiredString(args, "dataSource");
+                    String catalog = args.has("catalog") ? args.get("catalog").getAsString() : null;
+                    String schema = args.has("schema") ? args.get("schema").getAsString() : null;
+                    List<String> keywords = parseStringArray(args, "keywords");
+                    String tablePrefix = args.has("tablePrefix") ? args.get("tablePrefix").getAsString() : null;
+                    int maxTables = args.has("maxTables") ? args.get("maxTables").getAsInt() : 20;
+                    boolean includeIndexes = args.has("includeIndexes") && args.get("includeIndexes").getAsBoolean();
+                    McpSettingsState.DataSourceScope scope = parseScopeArg(args);
+                    Map<String, Object> sampleResult = databaseFacade.sampleSchema(
+                            project, dataSource, catalog, schema, keywords, tablePrefix, maxTables, includeIndexes, scope
+                    );
+                    logInfo("Executed tool " + McpToolDefinitions.TOOL_LIST_TABLE_SCHEMA
+                            + " on data source: " + dataSource + ", sampled=" + sampleResult.get("sampledCount"));
+                    yield ok(id, mcpToolResult(sampleResult));
+                }
                 default -> error(id, -32602, "Unsupported tool: " + toolName);
             };
         } catch (Exception ex) {
@@ -178,6 +193,45 @@ public final class McpProtocolRouter {
             throw new IllegalArgumentException("Argument must not be blank: " + field);
         }
         return value;
+    }
+
+    /**
+     * 解析 JSON 参数中的字符串数组字段。
+     * 支持 JSON 数组格式（["a","b"]）和逗号分隔字符串格式（"a,b"）两种输入方式。
+     *
+     * @param args      参数 JsonObject
+     * @param fieldName 字段名
+     * @return 解析后的字符串列表，字段不存在时返回空列表
+     */
+    private List<String> parseStringArray(JsonObject args, String fieldName) {
+        if (!args.has(fieldName) || args.get(fieldName).isJsonNull()) {
+            return new ArrayList<>();
+        }
+        JsonElement element = args.get(fieldName);
+        List<String> result = new ArrayList<>();
+        if (element.isJsonArray()) {
+            JsonArray array = element.getAsJsonArray();
+            for (JsonElement item : array) {
+                if (!item.isJsonNull()) {
+                    String val = item.getAsString();
+                    if (val != null && !val.isBlank()) {
+                        result.add(val.trim());
+                    }
+                }
+            }
+        } else {
+            // 降级处理：逗号分隔字符串
+            String raw = element.getAsString();
+            if (raw != null && !raw.isBlank()) {
+                for (String part : raw.split(",")) {
+                    String trimmed = part.trim();
+                    if (!trimmed.isEmpty()) {
+                        result.add(trimmed);
+                    }
+                }
+            }
+        }
+        return result;
     }
 
     private McpSettingsState.DataSourceScope parseScopeArg(JsonObject args) {

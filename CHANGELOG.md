@@ -8,11 +8,6 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [0.1.5] - 2026-04-07
 
-### Security
-
-- Changed HTTP server bind address from `0.0.0.0` to `127.0.0.1` (loopback only).
-  This prevents unintended access from other machines on the same local network.
-
 ### Changed
 
 - Plugin description updated with explicit network, privacy, and AI tool usage disclosures
@@ -21,6 +16,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- `database_list_datasources` 工具返回新增 `databaseVersion` 字段，展示各数据源的数据库版本信息。
+- 数据源类型推断新增三参数版本，优先通过 IntelliJ Database API（反射）获取产品类型，降级为 JDBC URL / 驱动类推断。
+- 数据库版本多优先级解析：Database API → JDBC URL 版本参数 → 驱动类名启发推断。
 - Log rotation support: configurable max file size, max rotated log files.
 - Configurable log read buffer size for performance tuning.
 - Project-level settings scope (GLOBAL / PROJECT) in the Settings UI.

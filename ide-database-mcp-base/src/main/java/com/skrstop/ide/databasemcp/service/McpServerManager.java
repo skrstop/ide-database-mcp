@@ -3,7 +3,6 @@ package com.skrstop.ide.databasemcp.service;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.components.Service;
-import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.extensions.PluginId;
 import com.skrstop.ide.databasemcp.db.IdeDatabaseFacade;
 import com.skrstop.ide.databasemcp.mcp.McpHttpHandler;
@@ -23,13 +22,12 @@ import java.util.concurrent.locks.ReentrantLock;
 
 @Service(Service.Level.APP)
 public final class McpServerManager implements Disposable {
-    private static final Logger LOG = Logger.getInstance(McpServerManager.class);
-    // 仅绑定本地回环地址，防止局域网其他机器直接访问数据库 MCP 服务
-    private static final String BIND_HOST = "127.0.0.1";
-    private static final String DISPLAY_HOST = "127.0.0.1";
-    private static final String MCP_PATH = "/mcp";
+    // LOG 字段已移除，统一使用 McpRuntimeLogService
     private static final String DATABASE_PLUGIN_ID = "com.intellij.database";
     private static final String DATABASE_MANAGER_CLASS = "com.intellij.database.psi.DataSourceManager";
+    private static final String BIND_HOST = "0.0.0.0";
+    private static final String DISPLAY_HOST = "127.0.0.1";
+    private static final String MCP_PATH = "/mcp";
     // 优雅关闭的超时时间（秒）
     private static final long GRACEFUL_SHUTDOWN_TIMEOUT = 10;
 
@@ -104,7 +102,6 @@ public final class McpServerManager implements Disposable {
     public StartResult startWithValidation(String reason, McpSettingsState.PluginSettingsScope scope) {
         String dependencyError = validateDatabaseDependency();
         if (dependencyError != null) {
-            LOG.warn("Database MCP start blocked (" + reason + "): " + dependencyError);
             logWarn("Start blocked (" + reason + "): " + dependencyError);
             return StartResult.failure(dependencyError);
         }
@@ -113,7 +110,6 @@ public final class McpServerManager implements Disposable {
         int port = settings.getPort(scope);
         String portError = validatePortAvailability(port);
         if (portError != null) {
-            LOG.warn("Database MCP start blocked (" + reason + "): " + portError);
             logWarn("Start blocked (" + reason + "): " + portError);
             return StartResult.failure(portError);
         }
@@ -121,7 +117,6 @@ public final class McpServerManager implements Disposable {
         lock.lock();
         try {
             if (running.get()) {
-                LOG.debug("MCP server already running, skip duplicate start: " + reason);
                 logInfo("Start skipped because server is already running (" + reason + ")");
                 return StartResult.success("Database MCP already running.");
             }
@@ -142,11 +137,9 @@ public final class McpServerManager implements Disposable {
 
             runningPort = port;
             running.set(true);
-            LOG.info("Database MCP started at " + getServiceUrl() + " (" + reason + ")");
             logInfo("Service started: " + getServiceUrl() + " (" + reason + ")");
             return StartResult.success("Database MCP started at " + getServiceUrl());
         } catch (IOException ex) {
-            LOG.warn("Failed to start Database MCP", ex);
             logError("Failed to start service: " + ex.getMessage());
             stop("start-failed");
             return StartResult.failure("Failed to start Database MCP: " + ex.getMessage());
@@ -158,7 +151,6 @@ public final class McpServerManager implements Disposable {
     public void startIfNeeded(String reason) {
         StartResult result = startWithValidation(reason);
         if (!result.isSuccess()) {
-            LOG.warn(result.getMessage());
             logWarn(result.getMessage());
         }
     }
@@ -176,7 +168,6 @@ public final class McpServerManager implements Disposable {
 
             running.set(false);
             runningPort = -1;
-            LOG.info("Database MCP stopped (" + reason + ")");
             logInfo("Service stopped (" + reason + ")");
         } finally {
             lock.unlock();
@@ -208,7 +199,7 @@ public final class McpServerManager implements Disposable {
             Class.forName(DATABASE_MANAGER_CLASS, false, McpServerManager.class.getClassLoader());
             return null;
         } catch (Throwable ex) {
-            LOG.warn("Database API class is unavailable", ex);
+            logWarn("Database API class is unavailable: " + ex.getMessage());
             return DatabaseMcpMessages.message("settings.databaseApiUnavailable", DATABASE_MANAGER_CLASS);
         }
     }
@@ -247,7 +238,6 @@ public final class McpServerManager implements Disposable {
     @Override
     public void dispose() {
         if (running.get()) {
-            LOG.info("Gracefully shutting down Database MCP on application exit");
             logInfo("Gracefully shutting down on application exit");
             stop("application-exit");
         }
@@ -285,35 +275,35 @@ public final class McpServerManager implements Disposable {
         }
 
         try {
-            LOG.info("Starting graceful shutdown of HttpServer executor pool");
+            logInfo("Starting graceful shutdown of HttpServer executor pool");
 
             // 第一步：停止接收新任务
             executor.shutdown();
 
             // 第二步：等待现有任务完成（带超时）
             if (!executor.awaitTermination(GRACEFUL_SHUTDOWN_TIMEOUT, TimeUnit.SECONDS)) {
-                LOG.warn("HttpServer executor did not terminate within " + GRACEFUL_SHUTDOWN_TIMEOUT +
+                logWarn("HttpServer executor did not terminate within " + GRACEFUL_SHUTDOWN_TIMEOUT +
                         " seconds, forcing shutdown");
 
                 // 第三步：强制关闭所有任务
                 var unfinishedTasks = executor.shutdownNow();
                 if (!unfinishedTasks.isEmpty()) {
-                    LOG.warn("Forced shutdown of " + unfinishedTasks.size() + " pending tasks");
+                    logWarn("Forced shutdown of " + unfinishedTasks.size() + " pending tasks");
                 }
 
                 // 再等待一次，确保所有线程都已停止
                 if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
-                    LOG.error("HttpServer executor failed to shutdown after forced termination");
+                    logError("HttpServer executor failed to shutdown after forced termination");
                 }
             } else {
-                LOG.info("HttpServer executor gracefully shut down");
+                logInfo("HttpServer executor gracefully shut down");
             }
         } catch (InterruptedException ex) {
-            LOG.warn("Interrupted while waiting for HttpServer executor shutdown", ex);
+            logWarn("Interrupted while waiting for HttpServer executor shutdown: " + ex.getMessage());
             // 再次尝试强制关闭
             var unfinishedTasks = executor.shutdownNow();
             if (!unfinishedTasks.isEmpty()) {
-                LOG.warn("Forced shutdown of " + unfinishedTasks.size() + " pending tasks after interruption");
+                logWarn("Forced shutdown of " + unfinishedTasks.size() + " pending tasks after interruption");
             }
             // 恢复中断状态
             Thread.currentThread().interrupt();

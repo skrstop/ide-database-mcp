@@ -1,6 +1,6 @@
 package com.skrstop.ide.databasemcp.db;
 
-import com.intellij.openapi.diagnostic.Logger;
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ProjectManager;
 import com.skrstop.ide.databasemcp.service.McpRuntimeLogService;
@@ -10,11 +10,23 @@ import java.sql.*;
 import java.util.*;
 
 public class IdeDatabaseFacade {
-    private static final Logger LOG = Logger.getInstance(IdeDatabaseFacade.class);
     private static final int DEFAULT_ROW_SIZE = 10;
 
-    private final DataSourceDiscoveryUtil discoveryUtil = new DataSourceDiscoveryUtil(LOG);
-    private final JdbcConnectionUtil connectionUtil = new JdbcConnectionUtil(LOG);
+    private static McpRuntimeLogService logService() {
+        return ApplicationManager.getApplication() == null
+                ? null
+                : ApplicationManager.getApplication().getService(McpRuntimeLogService.class);
+    }
+
+    private static void logWarn(String message) {
+        McpRuntimeLogService service = logService();
+        if (service != null) {
+            service.warn("facade", message);
+        }
+    }
+
+    private final DataSourceDiscoveryUtil discoveryUtil = new DataSourceDiscoveryUtil();
+    private final JdbcConnectionUtil connectionUtil = new JdbcConnectionUtil();
 
     public List<Map<String, Object>> listDataSources(String projectHint) {
         return listDataSources(projectHint, null);
@@ -28,7 +40,7 @@ public class IdeDatabaseFacade {
         try {
             scopedDataSources = discoveryUtil.findScopedDataSources(project, scope);
         } catch (IllegalStateException ex) {
-            LOG.warn("Data source discovery failed: " + ex.getMessage());
+            logWarn("Data source discovery failed: " + ex.getMessage());
             result.add(Map.of(
                     "name", "__discovery_error__",
                     "message", ex.getMessage()
@@ -102,6 +114,50 @@ public class IdeDatabaseFacade {
         return executeNoSqlInternal(projectHint, dataSourceName, statement, 1, overrideScope, NoSqlMode.WRITE_DELETE);
     }
 
+    /**
+     * Schema 智能采样：从大型企业数据库中按相关性评分提取局部 Schema。
+     *
+     * <p>通过关键词匹配（表名/列名/注释评分）+ 外键关联扩散算法，仅返回最相关的 Top-N 张表，
+     * 有效压缩 AI Prompt 长度，解决百表级数据库导致 AI"变笨"的问题。
+     *
+     * @param projectHint    项目路径提示（可为空）
+     * @param dataSourceName 数据源名称（来自 database_list_datasources 的结果）
+     * @param catalog        catalog/database 过滤（可为 null）
+     * @param schema         schema 过滤（可为 null）
+     * @param keywords       相关性关键词列表（可为 null 或空）
+     * @param tablePrefix    表名前缀过滤（可为 null）
+     * @param maxTables      最多返回表数量，默认 20，范围 1-200
+     * @param includeIndexes 是否附带索引信息
+     * @param overrideScope  数据源 scope 覆盖（可为 null，使用全局配置）
+     * @return 采样结果 Map，包含 totalTablesFound / sampledCount / tables
+     */
+    public Map<String, Object> sampleSchema(
+            String projectHint,
+            String dataSourceName,
+            String catalog,
+            String schema,
+            List<String> keywords,
+            String tablePrefix,
+            int maxTables,
+            boolean includeIndexes,
+            McpSettingsState.DataSourceScope overrideScope
+    ) {
+        Object dataSource = resolveRequiredDataSource(projectHint, dataSourceName, overrideScope);
+        try (Connection conn = connectionUtil.openConnection(dataSource, dataSourceName)) {
+            return SchemaSmartSampler.sample(
+                    conn,
+                    nullIfBlank(catalog),
+                    nullIfBlank(schema),
+                    keywords != null ? keywords : Collections.emptyList(),
+                    nullIfBlank(tablePrefix),
+                    Math.max(1, Math.min(200, maxTables)),
+                    includeIndexes
+            );
+        } catch (Exception ex) {
+            throw new IllegalStateException("Schema smart sample failed: " + ex.getMessage(), ex);
+        }
+    }
+
     public Map<String, Object> executeSql(String projectHint, String dataSourceName, String sql, int maxRows) {
         return executeQuerySql(projectHint, dataSourceName, sql, maxRows, null);
     }
@@ -132,10 +188,9 @@ public class IdeDatabaseFacade {
         }
 
         Object dataSource = resolveRequiredDataSource(projectHint, dataSourceName, overrideScope);
-        String dataSourceType = DataSourceTypeUtil.inferDataSourceType(
-                DbReflectionUtil.invokeString(LOG, dataSource, "getUrl"),
-                DbReflectionUtil.invokeString(LOG, dataSource, "getDriverClass")
-        );
+        String url = DbReflectionUtil.invokeString(dataSource, "getUrl");
+        String driverClass = DbReflectionUtil.invokeString(dataSource, "getDriverClass");
+        String dataSourceType = DataSourceTypeUtil.inferDataSourceType(dataSource, url, driverClass);
         return executeStatementInternal(
                 dataSource,
                 dataSourceName,
@@ -211,17 +266,19 @@ public class IdeDatabaseFacade {
 
     private Map<String, Object> mapDataSourceRow(DataSourceDiscoveryUtil.ScopedDataSource scoped) {
         Object ds = scoped.delegate();
-        String name = DbReflectionUtil.invokeString(LOG, ds, "getName");
-        String url = DbReflectionUtil.invokeString(LOG, ds, "getUrl");
-        String driver = DbReflectionUtil.invokeString(LOG, ds, "getDriverClass");
+        String name = DbReflectionUtil.invokeString(ds, "getName");
+        String url = DbReflectionUtil.invokeString(ds, "getUrl");
+        String driver = DbReflectionUtil.invokeString(ds, "getDriverClass");
         Map<String, Object> row = new HashMap<>();
         row.put("name", name);
         row.put("url", url);
         row.put("driverClass", driver);
-        row.put("type", DataSourceTypeUtil.inferDataSourceType(url, driver));
+        row.put("type", DataSourceTypeUtil.inferDataSourceType(ds, url, driver));
         row.put("scope", scoped.scope().name());
+        row.put("version", DataSourceTypeUtil.resolveDataSourceVersion(ds, url, driver));
         return row;
     }
+
 
     private McpSettingsState.DataSourceScope resolveScope(McpSettingsState.DataSourceScope overrideScope) {
         return overrideScope == null ? McpSettingsState.getInstance().getDataSourceScope() : overrideScope;
@@ -246,7 +303,7 @@ public class IdeDatabaseFacade {
     private Object findDataSourceByName(Project project, String name, McpSettingsState.DataSourceScope overrideScope) {
         McpSettingsState.DataSourceScope scope = resolveScope(overrideScope);
         for (DataSourceDiscoveryUtil.ScopedDataSource scoped : discoveryUtil.findScopedDataSources(project, scope)) {
-            String dsName = DbReflectionUtil.invokeString(LOG, scoped.delegate(), "getName");
+            String dsName = DbReflectionUtil.invokeString(scoped.delegate(), "getName");
             if (Objects.equals(dsName, name)) {
                 return scoped.delegate();
             }
@@ -259,6 +316,13 @@ public class IdeDatabaseFacade {
         row.put("name", name);
         row.put("type", type);
         return row;
+    }
+
+    /**
+     * 将空白字符串转换为 null，用于 JDBC metadata 参数（传 null 表示不过滤）。
+     */
+    private static String nullIfBlank(String value) {
+        return (value == null || value.isBlank()) ? null : value;
     }
 
     private enum SqlMode {

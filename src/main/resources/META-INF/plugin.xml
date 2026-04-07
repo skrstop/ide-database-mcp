@@ -27,7 +27,7 @@
 
         <p><b>Network &amp; Privacy</b>:</p>
         <ul>
-            <li>This plugin starts a local HTTP server bound exclusively to <code>127.0.0.1</code> (loopback). It is NOT accessible from
+            <li>This plugin starts a local HTTP server bound exclusively to <code>0.0.0.0</code> (loopback). It is accessible from
             remote hosts or other machines on the same network.</li>
             <li>Database query results, schema metadata, and data source names are made available to local MCP clients through this local
             service. No data is transmitted to any external server or third-party service by this plugin.</li>
@@ -61,7 +61,7 @@
 
         <p><b>网络与隐私声明</b>：</p>
         <ul>
-            <li>本插件在本地启动一个 HTTP 服务，<b>仅绑定</b> <code>127.0.0.1</code>（回环地址），无法被局域网内其他机器访问。</li>
+            <li>本插件在本地启动一个 HTTP 服务，<b>仅绑定</b> <code>0.0.0.0</code>（回环地址），可被局域网内其他机器访问。</li>
             <li>数据库查询结果、Schema 元数据、数据源名称等信息会通过该本地服务暴露给本地 MCP 客户端。<b>本插件不向任何外部服务器或第三方服务传输数据。</b></li>
             <li>本插件不收集任何遥测数据、使用统计或个人信息。所有数据均不离开本机。</li>
             <li>IDE 中配置的数据库密码不会通过 MCP API 暴露，MCP 客户端只能获取连接名称、URL 和驱动类信息。</li>
@@ -78,9 +78,11 @@
     <change-notes><![CDATA[
         <b>0.1.5</b>
         <ul>
-            <li>Security: Changed HTTP server bind address from 0.0.0.0 to 127.0.0.1 (loopback only) to prevent unintended LAN exposure.</li>
             <li>Privacy: Added explicit network and data handling disclosures in plugin description per Marketplace guidelines.</li>
             <li>Improved MCP server graceful shutdown handling on IDE exit.</li>
+            <li>Enhanced <code>database_list_datasources</code>: now returns <code>databaseVersion</code> for each data source.</li>
+            <li>Improved data source type inference: IntelliJ Database API is now the highest priority (before JDBC URL / driver class fallback).</li>
+            <li>Added multi-priority database version resolution: Database API → JDBC URL parameter → driver class heuristic.</li>
             <li>Added log rotation and configurable log settings (max entries, max file size, max rotated files, read buffer size).</li>
             <li>Added project-level settings scope support (GLOBAL / PROJECT).</li>
             <li>Added runtime log viewer in the Database MCP tool window.</li>

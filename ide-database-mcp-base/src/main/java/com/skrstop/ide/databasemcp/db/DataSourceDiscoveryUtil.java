@@ -1,9 +1,9 @@
 package com.skrstop.ide.databasemcp.db;
 
 import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ProjectManager;
+import com.skrstop.ide.databasemcp.service.McpRuntimeLogService;
 import com.skrstop.ide.databasemcp.settings.McpSettingsState;
 
 import java.lang.reflect.Array;
@@ -32,10 +32,27 @@ final class DataSourceDiscoveryUtil {
             "com.intellij.database.dataSource.DataSourceModelStorageImpl$App"
     );
 
-    private final Logger log;
+    DataSourceDiscoveryUtil() {
+    }
 
-    DataSourceDiscoveryUtil(Logger log) {
-        this.log = log;
+    private static McpRuntimeLogService logService() {
+        return ApplicationManager.getApplication() == null
+                ? null
+                : ApplicationManager.getApplication().getService(McpRuntimeLogService.class);
+    }
+
+    private static void logInfo(String message) {
+        McpRuntimeLogService service = logService();
+        if (service != null) {
+            service.info("discovery", message);
+        }
+    }
+
+    private static void logWarn(String message) {
+        McpRuntimeLogService service = logService();
+        if (service != null) {
+            service.warn("discovery", message);
+        }
     }
 
     List<ScopedDataSource> findScopedDataSources(Project project, McpSettingsState.DataSourceScope scope) {
@@ -109,7 +126,7 @@ final class DataSourceDiscoveryUtil {
         } catch (ClassNotFoundException ignored) {
             return null;
         } catch (Exception ex) {
-            log.debug("DataSourceStorage read failed: " + ex.getMessage());
+            logInfo("DataSourceStorage read failed: " + ex.getMessage());
             return null;
         }
     }
@@ -117,7 +134,7 @@ final class DataSourceDiscoveryUtil {
     private List<ScopedDataSource> asScopedDataSources(DiscoveryResult result, McpSettingsState.DataSourceScope scope) {
         if (!result.errors.isEmpty()) {
             for (String err : result.errors) {
-                log.warn(err);
+                logWarn(err);
             }
         }
 
@@ -153,11 +170,11 @@ final class DataSourceDiscoveryUtil {
     }
 
     private String dataSourceKey(Object dataSource) {
-        String name = DbReflectionUtil.invokeString(log, dataSource, "getName");
+        String name = DbReflectionUtil.invokeString(dataSource, "getName");
         if (name != null && !name.isBlank()) {
             return "name:" + name;
         }
-        String url = DbReflectionUtil.invokeString(log, dataSource, "getUrl");
+        String url = DbReflectionUtil.invokeString(dataSource, "getUrl");
         return "url:" + (url == null ? String.valueOf(System.identityHashCode(dataSource)) : url);
     }
 

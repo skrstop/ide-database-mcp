@@ -115,6 +115,37 @@ class DatabaseMcpToolset : McpToolset {
         return gson.toJson(result)
     }
 
+    @McpTool(name = McpToolDefinitions.TOOL_LIST_TABLE_SCHEMA)
+    @McpDescription(description = McpToolDefinitions.DESC_LIST_TABLE_SCHEMA)
+    suspend fun database_schema_smart_sample(
+        project: String?,
+        scope: String?,
+        dataSource: String,
+        catalog: String?,
+        schema: String?,
+        keywords: List<String>?,
+        tablePrefix: String?,
+        maxTables: Int?,
+        includeIndexes: Boolean?
+    ): String {
+        requireText(dataSource, "dataSource")
+        val resolvedScope = parseScope(scope)
+        val effectiveMaxTables = maxTables ?: 20
+        val effectiveIncludeIndexes = includeIndexes ?: false
+        val result = facade.sampleSchema(
+            resolveProjectHint(project),
+            dataSource,
+            catalog,
+            schema,
+            keywords ?: emptyList(),
+            tablePrefix,
+            effectiveMaxTables,
+            effectiveIncludeIndexes,
+            resolvedScope
+        )
+        return gson.toJson(result)
+    }
+
     private fun parseScope(scope: String?): McpSettingsState.DataSourceScope? {
         if (scope.isNullOrBlank()) return null
         return try {
