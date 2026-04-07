@@ -1,7 +1,12 @@
 # IDE Database MCP
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
+[![JetBrains Marketplace](https://img.shields.io/badge/JetBrains-Marketplace-blue)](https://plugins.jetbrains.com/plugin/27084)
+
 English (default) — this repository contains a JetBrains IDE plugin that exposes the IDE's Database data sources through
-a local MCP-compatible service.
+a local MCP-compatible service, enabling AI assistants (Claude, GitHub Copilot, Cursor, etc.) to discover and query
+your databases directly from the IDE context.
+
 Development note: 95%+ of this project's code was generated with GitHub Copilot, Claude, and Codex, then reviewed and
 integrated manually.
 
@@ -22,12 +27,20 @@ loaded automatically; when it is absent, the plugin still runs with the built-in
 
 ## Source and purpose
 
-This plugin was developed to make IDE-managed Database data sources accessible to external tools through a lightweight
-HTTP/JSON-RPC MCP-compatible bridge. It is intended for tooling that expects an MCP-style service to discover and call
-database capabilities available inside the IDE.
+This plugin was developed to make IDE-managed Database data sources accessible to AI tools and external MCP clients
+through a lightweight HTTP/JSON-RPC MCP-compatible bridge. It is intended for tooling that expects an MCP-style service
+to discover and call database capabilities available inside the IDE.
 
 The project is implemented against the IntelliJ Platform (since build 223+) and is intended for JetBrains IDEs where the
 bundled `com.intellij.database` plugin is available and enabled.
+
+## Security & Privacy
+
+- The local HTTP server binds **exclusively** to `0.0.0.0` (loopback). It is reachable from other machines
+  on the same network.
+- Database credentials (passwords) are **never** exposed through the MCP API.
+- No telemetry, usage data, or personal information is collected or transmitted by this plugin.
+- Query results and schema metadata are served only to local MCP clients on the same machine.
 
 ## Key features
 
@@ -166,7 +179,7 @@ this plugin.
 Clone the repository and use the included Gradle wrapper:
 
 ```bash
-git clone <this-repo-url>
+git clone https://github.com/skrstop/ide-database-mcp.git
 cd ide-database-mcp
 chmod +x ./gradlew
 ./gradlew test
@@ -187,20 +200,26 @@ chmod +x ./gradlew
 - If the plugin reports Database API unavailable, check that `com.intellij.database` is installed and enabled.
 - If no data source is returned, verify data sources are configured in the IDE and the selected scope is correct.
 
+## Changelog
+
+See [CHANGELOG.md](./CHANGELOG.md) for the full version history.
+
 ## Other notes
 
 - In `ALL` scope mode, duplicate names are resolved by preferring global (IDE-level) entries before project-level
   entries.
 - The plugin performs runtime checks for Database plugin/API availability and reports user-friendly errors when missing.
 
-## License and attribution
+## License
+
+This project is licensed under the [MIT License](./LICENSE).
+
+## Attribution
 
 This project was inspired by work from others in the community. Special thanks to:
 
 - jone — early feedback and ideas
 - The project `ide-agent-for-copilot` by catatafishen: https://github.com/catatafishen/ide-agent-for-copilot
-
-Please see the repository LICENSE (if present) for licensing details.
 
 ---
 

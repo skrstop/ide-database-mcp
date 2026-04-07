@@ -1,7 +1,11 @@
 # IDE Database MCP
 
-本仓库包含一个 JetBrains IDE 插件，旨在通过本地 MCP 兼容服务将 IDE 管理的 Database 数据源暴露给外部工具（默认英文版在
-README.md）。
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
+[![JetBrains Marketplace](https://img.shields.io/badge/JetBrains-Marketplace-blue)](https://plugins.jetbrains.com/plugin/27084)
+
+本仓库包含一个 JetBrains IDE 插件，通过本地 MCP（Model Context Protocol）兼容服务将 IDE 管理的 Database 数据源暴露给 AI
+助手和外部工具（Claude、GitHub Copilot、Cursor 等）。默认英文版在 [README.md](./README.md)。
+
 开发说明：本项目 95%+ 的代码由 GitHub Copilot、Claude 与 Codex 生成，并由人工审阅和整合。
 
 ---
@@ -17,10 +21,17 @@ README.md）。
 
 ## 源起与目的
 
-该插件的目标是让 IDE 内管理的 Database 数据源可以被外部进程/工具通过轻量 HTTP/JSON-RPC MCP 兼容桥接访问，方便自动化工具或代理调用
-IDE 内的数据库能力。
+该插件的目标是让 IDE 内管理的 Database 数据源可以被 AI 工具和外部 MCP 客户端通过轻量 HTTP/JSON-RPC MCP 兼容桥接访问，方便
+AI 助手直接查询 IDE 内配置的数据库。
 
 项目基于 IntelliJ 平台（since build 223+）实现，适用于已提供并启用 `com.intellij.database` 插件的 JetBrains IDE。
+
+## 安全与隐私
+
+- 本地 HTTP 服务**仅绑定** `127.0.0.1`（回环地址），**无法**被局域网内其他机器访问。
+- 数据库密码**不会**通过 MCP API 暴露，MCP 客户端只能获取连接名称、URL 和驱动类信息。
+- 本插件**不收集**任何遥测数据、使用统计或个人信息，所有数据均不离开本机。
+- 查询结果和 Schema 元数据仅通过本地服务提供给同一台机器上的 MCP 客户端。
 
 ## 主要功能
 
@@ -32,7 +43,7 @@ IDE 内的数据库能力。
     - `database_execute_sql_ddl` — SQL 结构变更用途工具。
     - `database_execute_nosql_query` — NoSQL 查询用途工具。
     - `database_execute_nosql_write_delete` — NoSQL 写入/删除用途工具。
-- 执行约束以工具说明和参数说明为准：调用方需自行选择正确工具；服务端不再做 SQL/NoSQL 关键字判断或写死 DB 类型拦截。
+- 执行约束以工具说明和参数说明为准：调用方需自行选择正确工具；服务端不做 SQL/NoSQL 关键字判断。
 - 插件设置页面：`Settings | Tools | Database MCP`
 - 支持本地 MCP 服务自动启动
 - 支持数据源范围控制：`GLOBAL` / `PROJECT` / `ALL`
@@ -154,7 +165,7 @@ curl -s http://127.0.0.1:8765/mcp \
 ## 构建与调试（开发）
 
 ```bash
-git clone <this-repo-url>
+git clone https://github.com/skrstop/ide-database-mcp.git
 cd ide-database-mcp
 chmod +x ./gradlew
 # 运行测试（可能需要联网下载 IntelliJ 平台工件）
@@ -176,21 +187,26 @@ chmod +x ./gradlew
 - 若提示 Database API 不可用，请确认 `com.intellij.database` 插件已安装并启用。
 - 若未返回数据源，请确认 IDE 已配置数据源，且当前范围选择正确。
 
+## 变更日志
+
+完整版本历史请见 [CHANGELOG.md](./CHANGELOG.md)。
+
 ## 其他说明
 
 - 在 `ALL` 模式下，如遇到重复的数据源名称会优先使用全局（IDE）定义而非项目级定义。
 - 插件在运行时会检查 Database 插件是否存在并能正常访问 API；若缺失或 API 不可用，会向用户显示友好错误提示。
 
-## 许可与致谢
+## 许可
+
+本项目采用 [MIT 许可证](./LICENSE)。
+
+## 致谢
 
 本项目受社区项目启发，特别感谢：
 
 - jone（早期反馈与建议）
 - `ide-agent-for-copilot`（作者 catatafishen）：https://github.com/catatafishen/ide-agent-for-copilot
 
-许可信息请参见仓库中的 LICENSE（如有）。
-
 ---
 
 英文原文 / English version: [README.md](./README.md)
-

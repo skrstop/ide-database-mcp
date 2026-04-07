@@ -13,6 +13,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
@@ -24,6 +26,7 @@ public final class McpRuntimeLogService {
     private static final Logger LOG = Logger.getInstance(McpRuntimeLogService.class);
     private static final Logger RUNTIME_LOGGER = Logger.getInstance("DatabaseMcpRuntime");
     private static final String LOG_FILE_NAME = "ide_database_mcp_runtime.log";
+    private static final DateTimeFormatter DATATIME_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS", Locale.ROOT);
 
     private final ReentrantLock lock = new ReentrantLock();
 
@@ -135,7 +138,7 @@ public final class McpRuntimeLogService {
     }
 
     private void append(String level, String message) {
-        String line = String.format(Locale.ROOT, "[%s] %s", level, message);
+        String line = String.format(Locale.ROOT, "%s [%s] %s", LocalDateTime.now().format(DATATIME_FORMAT), level, message);
 
         if ("ERROR".equals(level)) {
             RUNTIME_LOGGER.error(line);

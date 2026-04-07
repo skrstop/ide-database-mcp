@@ -4,7 +4,7 @@ plugins {
 }
 
 group = "com.skrstop.ide"
-val baseVersion = "0.1.4"
+val baseVersion = "0.1.5"
 
 
 // 1. 读取命令行参数，默认为 "modern" (包含 新版本特性)
@@ -82,14 +82,14 @@ tasks {
                 // Modern 版：将占位符替换为真实的依赖声明
                 filter { line ->
                     line.replace(
-                        "<depends-mcp-server />",
+                        "<depends-mcp-server/>",
                         """<depends optional="true" config-file="mcpserver-integration.xml">com.intellij.mcpServer</depends>"""
                     )
                 }
             } else {
                 // Legacy 版：直接抹除占位符，彻底切断与 MCP 的关联
                 filter { line ->
-                    line.replace("<depends-mcp-server />", "")
+                    line.replace("<depends-mcp-server/>", "")
                 }
             }
         }

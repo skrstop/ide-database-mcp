@@ -24,7 +24,8 @@ import java.util.concurrent.locks.ReentrantLock;
 @Service(Service.Level.APP)
 public final class McpServerManager implements Disposable {
     private static final Logger LOG = Logger.getInstance(McpServerManager.class);
-    private static final String BIND_HOST = "0.0.0.0";
+    // 仅绑定本地回环地址，防止局域网其他机器直接访问数据库 MCP 服务
+    private static final String BIND_HOST = "127.0.0.1";
     private static final String DISPLAY_HOST = "127.0.0.1";
     private static final String MCP_PATH = "/mcp";
     private static final String DATABASE_PLUGIN_ID = "com.intellij.database";

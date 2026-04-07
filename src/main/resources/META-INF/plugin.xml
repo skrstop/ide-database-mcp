@@ -3,8 +3,8 @@
     <name>IDE Database MCP</name>
     <vendor email="4086824@qq.com" url="https://github.com/skrstop/ide-database-mcp">Skrstop</vendor>
     <description><![CDATA[
-        <p><b>English</b></p>
-        <p><b>IDE Database MCP</b> exposes database connections configured in JetBrains IDEs as a local MCP service, so MCP clients can discover data sources and execute SQL directly from the IDE context.</p>
+        <p><b>IDE Database MCP</b> exposes database connections configured in JetBrains IDEs as a local MCP (Model Context Protocol) service,
+        so AI/MCP clients can discover data sources and execute SQL directly from the IDE context.</p>
 
         <p><b>Tool list (tools/list)</b></p>
         <ul>
@@ -17,17 +17,36 @@
             <li><code>database_execute_nosql_write_delete</code>: execute NoSQL statements intended for write/delete usage.</li>
         </ul>
 
-        <p><b>Database coverage</b>: <code>database_list_databases</code> works for major SQL engines (MySQL, PostgreSQL, Oracle, SQL Server, SQLite, CockroachDB, H2) and metadata-aware NoSQL connectors (MongoDB, Apache Cassandra, Redis, etc.). When metadata is missing you can still inspect the store with <code>database_execute_sql_query</code>.</p>
-        <p><b>Data source metadata</b>: entries returned by <code>database_list_datasources</code> include a <code>type</code> label derived from the JDBC URL/driver (falls back to Custom) so clients know if they are talking to MySQL, PostgreSQL, MongoDB, etc.</p>
+        <p><b>Database coverage</b>: <code>database_list_databases</code> works for major SQL engines (MySQL, PostgreSQL, Oracle, SQL Server,
+        SQLite, CockroachDB, H2) and metadata-aware NoSQL connectors (MongoDB, Apache Cassandra, Redis, etc.).</p>
 
-        <p><b>SQL capability</b>: This plugin supports query, DML, and DDL tools. Actual execution is determined by your database account permissions and data source privileges.</p>
-        <p><b>Requirement</b>: The JetBrains Database Tools plugin is required and must be available (<code>com.intellij.database</code>).</p>
+        <p><b>SQL capability</b>: This plugin supports query, DML, and DDL tools. Actual execution is determined by your database account
+        permissions and data source privileges.</p>
+
+        <p><b>Requirement</b>: The JetBrains Database Tools plugin (<code>com.intellij.database</code>) is required.</p>
+
+        <p><b>Network &amp; Privacy</b>:</p>
+        <ul>
+            <li>This plugin starts a local HTTP server bound exclusively to <code>127.0.0.1</code> (loopback). It is NOT accessible from
+            remote hosts or other machines on the same network.</li>
+            <li>Database query results, schema metadata, and data source names are made available to local MCP clients through this local
+            service. No data is transmitted to any external server or third-party service by this plugin.</li>
+            <li>This plugin does not collect telemetry, usage statistics, or personal data. No data leaves your machine.</li>
+            <li>Database credentials (passwords) configured in the IDE are not exported or accessible through the MCP API — only connection
+            names, URLs, and driver class information are exposed.</li>
+        </ul>
+
+        <p><b>AI Tool Usage</b>: This plugin is designed to work with AI assistants and MCP clients (e.g., Claude, GitHub Copilot,
+        Cursor). When an AI client calls this plugin's tools, the AI receives database schema information and query results from your
+        local IDE data sources. You retain full control over which data sources are exposed via the scope setting (GLOBAL / PROJECT / ALL).</p>
+
         <p><b>Source code</b>: <a href="https://github.com/skrstop/ide-database-mcp">https://github.com/skrstop/ide-database-mcp</a></p>
 
         <hr/>
 
-        <p><b>中文</b></p>
-        <p><b>IDE Database MCP</b> 将 JetBrains IDE 中已配置的数据库连接暴露为本地 MCP 服务，使 MCP 客户端可以直接基于 IDE 上下文发现数据源并执行 SQL。</p>
+        <p><b>中文说明</b></p>
+        <p><b>IDE Database MCP</b> 将 JetBrains IDE 中已配置的数据库连接暴露为本地 MCP（Model Context Protocol）服务，使 AI/MCP
+        客户端可以直接基于 IDE 上下文发现数据源并执行 SQL。</p>
 
         <p><b>工具列表（tools/list）</b></p>
         <ul>
@@ -40,13 +59,68 @@
             <li><code>database_execute_nosql_write_delete</code>：执行用于写入/删除用途的 NoSQL 语句。</li>
         </ul>
 
-        <p><b>数据库兼容性</b>：<code>database_list_databases</code> 兼容主流 SQL 引擎（MySQL、PostgreSQL、Oracle、SQL Server、SQLite、CockroachDB、H2）以及暴露元数据的 NoSQL 连接（MongoDB、Apache Cassandra、Redis 等）；当元数据不可用时，可以使用 <code>database_execute_sql_query</code> 手动探查。</p>
-        <p><b>数据源元信息</b>：<code>database_list_datasources</code> 会在返回项中附带根据 JDBC URL/Driver 推断的 <code>type</code> 标签，无法识别时默认 Custom，方便客户端区分 MySQL、PostgreSQL、MongoDB 等。</p>
+        <p><b>网络与隐私声明</b>：</p>
+        <ul>
+            <li>本插件在本地启动一个 HTTP 服务，<b>仅绑定</b> <code>127.0.0.1</code>（回环地址），无法被局域网内其他机器访问。</li>
+            <li>数据库查询结果、Schema 元数据、数据源名称等信息会通过该本地服务暴露给本地 MCP 客户端。<b>本插件不向任何外部服务器或第三方服务传输数据。</b></li>
+            <li>本插件不收集任何遥测数据、使用统计或个人信息。所有数据均不离开本机。</li>
+            <li>IDE 中配置的数据库密码不会通过 MCP API 暴露，MCP 客户端只能获取连接名称、URL 和驱动类信息。</li>
+        </ul>
 
-        <p><b>SQL 能力说明</b>：本插件支持查询、DML、DDL 三类 SQL 工具；是否可实际执行取决于你的数据库账号权限和数据源权限。</p>
+        <p><b>AI 工具使用说明</b>：本插件专为与 AI 助手和 MCP 客户端（如 Claude、GitHub Copilot、Cursor 等）协同工作而设计。当 AI
+        客户端调用本插件工具时，AI 会从本地 IDE 数据源中获取数据库 Schema 信息和查询结果。你可以通过 scope 设置（GLOBAL / PROJECT /
+        ALL）控制哪些数据源被暴露。</p>
+
         <p><b>依赖要求</b>：必须安装并可用 JetBrains Database Tools 插件（<code>com.intellij.database</code>）。</p>
         <p><b>代码地址</b>：<a href="https://github.com/skrstop/ide-database-mcp">https://github.com/skrstop/ide-database-mcp</a></p>
     ]]></description>
+
+    <change-notes><![CDATA[
+        <b>0.1.5</b>
+        <ul>
+            <li>Security: Changed HTTP server bind address from 0.0.0.0 to 127.0.0.1 (loopback only) to prevent unintended LAN exposure.</li>
+            <li>Privacy: Added explicit network and data handling disclosures in plugin description per Marketplace guidelines.</li>
+            <li>Improved MCP server graceful shutdown handling on IDE exit.</li>
+            <li>Added log rotation and configurable log settings (max entries, max file size, max rotated files, read buffer size).</li>
+            <li>Added project-level settings scope support (GLOBAL / PROJECT).</li>
+            <li>Added runtime log viewer in the Database MCP tool window.</li>
+        </ul>
+
+        <b>0.1.4</b>
+        <ul>
+            <li>Dual-variant build: <code>modern</code> (IDE 2025.2+, includes MCP Server toolset integration) and <code>legacy</code> (IDE 2022.3–2025.1).</li>
+            <li>Optional <code>mcpToolset</code> extension for <code>com.intellij.mcpServer</code> when available in the IDE.</li>
+            <li>Tool window: Method counter, call statistics (avg/total ms), and log search panel.</li>
+            <li>Multi-window-safe startup using app-level state locking.</li>
+        </ul>
+
+        <b>0.1.3</b>
+        <ul>
+            <li>Added NoSQL tools: <code>database_execute_nosql_query</code> and <code>database_execute_nosql_write_delete</code>.</li>
+            <li>Added <code>database_list_databases</code> tool for catalog/schema enumeration.</li>
+            <li>Added data source type inference from JDBC URL and driver class.</li>
+            <li>Added data source scope control: GLOBAL / PROJECT / ALL.</li>
+        </ul>
+
+        <b>0.1.2</b>
+        <ul>
+            <li>Added Settings UI under <code>Settings | Tools | Database MCP</code>.</li>
+            <li>Added auto-start option for the local MCP service on IDE startup.</li>
+            <li>Added service status display and manual start/stop controls.</li>
+        </ul>
+
+        <b>0.1.1</b>
+        <ul>
+            <li>Split SQL tools into separate <code>database_execute_sql_query</code>, <code>database_execute_sql_dml</code>, and <code>database_execute_sql_ddl</code> tools.</li>
+            <li>Added health endpoint at <code>/health</code>.</li>
+        </ul>
+
+        <b>0.1.0</b>
+        <ul>
+            <li>Initial release: local MCP/JSON-RPC service exposing JetBrains Database data sources.</li>
+            <li>Supported tools: <code>database_list_datasources</code>, <code>database_execute_sql_query</code>.</li>
+        </ul>
+    ]]></change-notes>
 
     <depends>com.intellij.modules.platform</depends>
     <depends>com.intellij.database</depends>

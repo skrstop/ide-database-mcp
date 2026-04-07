@@ -367,7 +367,7 @@ public final class McpSettingsState implements PersistentStateComponent<McpSetti
         public boolean settingsConfigured = false;
         public int toolWindowTopDividerLocation = 100;
         public int toolWindowBottomDividerLocation = 220;
-        public int maxEntries = 2000;
+        public int maxEntries = 500;
         public long maxFileSize = 10 * 1024 * 1024;
         public int maxLogFiles = 5;
         public int readBufferSize = 512 * 1024;
