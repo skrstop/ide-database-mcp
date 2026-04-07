@@ -76,20 +76,26 @@ tasks {
         useJUnitPlatform()
     }
     // 6. 动态修改 META-INF/plugin.xml 里的依赖声明
-    withType<ProcessResources> {
-        filesMatching("META-INF/plugin.xml") {
-            if (isModern) {
-                // Modern 版：将占位符替换为真实的依赖声明
-                filter { line ->
-                    line.replace(
-                        "<depends-mcp-server/>",
+    // 注意：patchPluginXml 直接读取源文件，不经过 processResources，
+    // 必须在 patchPluginXml 的 doLast 中修改其输出文件，才能影响最终打包结果。
+    named("patchPluginXml") {
+        doLast {
+            outputs.files.asFileTree.matching {
+                include("**/*.xml")
+            }.forEach { file ->
+                val original = file.readText()
+                val patched = if (isModern) {
+                    // Modern 版：将占位符替换为真实的依赖声明
+                    original.replace(
+                        "<depends-mcp-server />",
                         """<depends optional="true" config-file="mcpserver-integration.xml">com.intellij.mcpServer</depends>"""
                     )
+                } else {
+                    // Legacy 版：直接抹除占位符，彻底切断与 MCP 的关联
+                    original.replace("<depends-mcp-server />", "")
                 }
-            } else {
-                // Legacy 版：直接抹除占位符，彻底切断与 MCP 的关联
-                filter { line ->
-                    line.replace("<depends-mcp-server/>", "")
+                if (patched != original) {
+                    file.writeText(patched)
                 }
             }
         }
