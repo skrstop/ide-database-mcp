@@ -1,6 +1,5 @@
 package com.skrstop.ide.databasemcp.db;
 
-import com.intellij.openapi.application.ApplicationManager;
 import com.skrstop.ide.databasemcp.service.McpRuntimeLogService;
 
 import java.sql.Connection;
@@ -228,7 +227,7 @@ final class SchemaSmartSampler {
                     }
                 }
             } catch (Exception e) {
-                logWarn("加载表 [" + table.tableName + "] 列信息失败: " + e.getMessage());
+                McpRuntimeLogService.logWarn("sampler", "加载表 [" + table.tableName + "] 列信息失败: " + e.getMessage());
             }
         }
     }
@@ -249,7 +248,7 @@ final class SchemaSmartSampler {
         try {
             meta = conn.getMetaData();
         } catch (Exception e) {
-            logWarn("获取 DatabaseMetaData 失败，外键关系将被忽略: " + e.getMessage());
+            McpRuntimeLogService.logWarn("sampler", "获取 DatabaseMetaData 失败，外键关系将被忽略: " + e.getMessage());
             return relations;
         }
 
@@ -264,7 +263,7 @@ final class SchemaSmartSampler {
                     }
                 }
             } catch (Exception e) {
-                logInfo("加载表 [" + table.tableName + "] 外键失败（已跳过）: " + e.getMessage());
+                McpRuntimeLogService.logInfo("sampler", "加载表 [" + table.tableName + "] 外键失败（已跳过）: " + e.getMessage());
             }
         }
         return relations;
@@ -440,7 +439,7 @@ final class SchemaSmartSampler {
                 indexes.addAll(indexMap.values());
             }
         } catch (Exception e) {
-            logInfo("加载表 [" + table.tableName + "] 索引失败（已跳过）: " + e.getMessage());
+            McpRuntimeLogService.logInfo("sampler", "加载表 [" + table.tableName + "] 索引失败（已跳过）: " + e.getMessage());
         }
         return indexes;
     }
@@ -507,25 +506,6 @@ final class SchemaSmartSampler {
     //  日志辅助方法（统一使用 McpRuntimeLogService，避免直接依赖 IntelliJ Logger）
     // =========================================================================
 
-    private static McpRuntimeLogService logService() {
-        return ApplicationManager.getApplication() == null
-                ? null
-                : ApplicationManager.getApplication().getService(McpRuntimeLogService.class);
-    }
-
-    private static void logWarn(String message) {
-        McpRuntimeLogService service = logService();
-        if (service != null) {
-            service.warn("sampler", message);
-        }
-    }
-
-    private static void logInfo(String message) {
-        McpRuntimeLogService service = logService();
-        if (service != null) {
-            service.info("sampler", message);
-        }
-    }
 
     // =========================================================================
     //  内部数据模型

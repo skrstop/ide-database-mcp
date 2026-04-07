@@ -132,7 +132,7 @@ class DatabaseMcpToolset : McpToolset {
         val resolvedScope = parseScope(scope)
         val effectiveMaxTables = maxTables ?: 20
         val effectiveIncludeIndexes = includeIndexes ?: false
-        val result = facade.sampleSchema(
+        val result = facade.listTableSchema(
             resolveProjectHint(project),
             dataSource,
             catalog,

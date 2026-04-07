@@ -35,26 +35,6 @@ final class DataSourceDiscoveryUtil {
     DataSourceDiscoveryUtil() {
     }
 
-    private static McpRuntimeLogService logService() {
-        return ApplicationManager.getApplication() == null
-                ? null
-                : ApplicationManager.getApplication().getService(McpRuntimeLogService.class);
-    }
-
-    private static void logInfo(String message) {
-        McpRuntimeLogService service = logService();
-        if (service != null) {
-            service.info("discovery", message);
-        }
-    }
-
-    private static void logWarn(String message) {
-        McpRuntimeLogService service = logService();
-        if (service != null) {
-            service.warn("discovery", message);
-        }
-    }
-
     List<ScopedDataSource> findScopedDataSources(Project project, McpSettingsState.DataSourceScope scope) {
         return switch (scope) {
             case GLOBAL -> loadGlobalScopedDataSources(null);
@@ -126,7 +106,7 @@ final class DataSourceDiscoveryUtil {
         } catch (ClassNotFoundException ignored) {
             return null;
         } catch (Exception ex) {
-            logInfo("DataSourceStorage read failed: " + ex.getMessage());
+            McpRuntimeLogService.logInfo("discovery", "DataSourceStorage read failed: " + ex.getMessage());
             return null;
         }
     }
@@ -134,7 +114,7 @@ final class DataSourceDiscoveryUtil {
     private List<ScopedDataSource> asScopedDataSources(DiscoveryResult result, McpSettingsState.DataSourceScope scope) {
         if (!result.errors.isEmpty()) {
             for (String err : result.errors) {
-                logWarn(err);
+                McpRuntimeLogService.logWarn("discovery", err);
             }
         }
 
@@ -170,11 +150,11 @@ final class DataSourceDiscoveryUtil {
     }
 
     private String dataSourceKey(Object dataSource) {
-        String name = DbReflectionUtil.invokeString(dataSource, "getName");
+        String name = DataSourceTypeUtil.resolveDataSourceName(dataSource);
         if (name != null && !name.isBlank()) {
             return "name:" + name;
         }
-        String url = DbReflectionUtil.invokeString(dataSource, "getUrl");
+        String url = DataSourceTypeUtil.resolveDataSourceUrl(dataSource);
         return "url:" + (url == null ? String.valueOf(System.identityHashCode(dataSource)) : url);
     }
 
@@ -509,4 +489,3 @@ final class DataSourceDiscoveryUtil {
         }
     }
 }
-

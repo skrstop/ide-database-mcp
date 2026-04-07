@@ -26,14 +26,14 @@ public final class McpHttpHandler implements HttpHandler {
             byte[] body = "Method Not Allowed".getBytes(StandardCharsets.UTF_8);
             exchange.sendResponseHeaders(405, body.length);
             exchange.getResponseBody().write(body);
-            logWarn("[HTTP-IN] method=" + method + " uri=" + uri + " body=<empty>");
-            logWarn("[HTTP-OUT] status=405 body=" + formatPayload("Method Not Allowed"));
+            McpRuntimeLogService.logWarn("http", "[HTTP-IN] method=" + method + " uri=" + uri + " body=<empty>");
+            McpRuntimeLogService.logWarn("http", "[HTTP-OUT] status=405 body=" + formatPayload("Method Not Allowed"));
             exchange.close();
             return;
         }
 
         String requestBody = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
-        logInfo("[HTTP-IN] method=" + method + " uri=" + uri + " body=" + formatPayload(requestBody));
+        McpRuntimeLogService.logInfo("http", "[HTTP-IN] method=" + method + " uri=" + uri + " body=" + formatPayload(requestBody));
 
         int status = 200;
         String response;
@@ -42,14 +42,14 @@ public final class McpHttpHandler implements HttpHandler {
         } catch (Exception ex) {
             status = 500;
             response = "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32603,\"message\":\"Internal error: " + escapeJson(ex.getMessage()) + "\"}}";
-            logError("[HTTP-OUT] status=500 reason=" + ex.getMessage());
+            McpRuntimeLogService.logError("http", "[HTTP-OUT] status=500 reason=" + ex.getMessage());
         }
 
         byte[] bytes = response.getBytes(StandardCharsets.UTF_8);
         exchange.getResponseHeaders().set("Content-Type", "application/json; charset=utf-8");
         exchange.sendResponseHeaders(status, bytes.length);
         exchange.getResponseBody().write(bytes);
-        logInfo("[HTTP-OUT] status=" + status + " body=" + formatPayload(response));
+        McpRuntimeLogService.logInfo("http", "[HTTP-OUT] status=" + status + " body=" + formatPayload(response));
         exchange.close();
     }
 
@@ -71,32 +71,5 @@ public final class McpHttpHandler implements HttpHandler {
                 .replace("\"", "\\\"")
                 .replace("\r", " ")
                 .replace("\n", " ");
-    }
-
-    private void logInfo(String message) {
-        McpRuntimeLogService service = logService();
-        if (service != null) {
-            service.info("http", message);
-        }
-    }
-
-    private void logWarn(String message) {
-        McpRuntimeLogService service = logService();
-        if (service != null) {
-            service.warn("http", message);
-        }
-    }
-
-    private void logError(String message) {
-        McpRuntimeLogService service = logService();
-        if (service != null) {
-            service.error("http", message);
-        }
-    }
-
-    private McpRuntimeLogService logService() {
-        return com.intellij.openapi.application.ApplicationManager.getApplication() == null
-                ? null
-                : McpRuntimeLogService.getInstance();
     }
 }

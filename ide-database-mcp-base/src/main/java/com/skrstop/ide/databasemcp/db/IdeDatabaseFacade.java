@@ -1,8 +1,9 @@
 package com.skrstop.ide.databasemcp.db;
 
-import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ProjectManager;
+import com.skrstop.ide.databasemcp.enums.NoSqlMode;
+import com.skrstop.ide.databasemcp.enums.SqlMode;
 import com.skrstop.ide.databasemcp.service.McpRuntimeLogService;
 import com.skrstop.ide.databasemcp.settings.McpSettingsState;
 
@@ -11,19 +12,6 @@ import java.util.*;
 
 public class IdeDatabaseFacade {
     private static final int DEFAULT_ROW_SIZE = 10;
-
-    private static McpRuntimeLogService logService() {
-        return ApplicationManager.getApplication() == null
-                ? null
-                : ApplicationManager.getApplication().getService(McpRuntimeLogService.class);
-    }
-
-    private static void logWarn(String message) {
-        McpRuntimeLogService service = logService();
-        if (service != null) {
-            service.warn("facade", message);
-        }
-    }
 
     private final DataSourceDiscoveryUtil discoveryUtil = new DataSourceDiscoveryUtil();
     private final JdbcConnectionUtil connectionUtil = new JdbcConnectionUtil();
@@ -40,7 +28,7 @@ public class IdeDatabaseFacade {
         try {
             scopedDataSources = discoveryUtil.findScopedDataSources(project, scope);
         } catch (IllegalStateException ex) {
-            logWarn("Data source discovery failed: " + ex.getMessage());
+            McpRuntimeLogService.logWarn("facade", "Data source discovery failed: " + ex.getMessage());
             result.add(Map.of(
                     "name", "__discovery_error__",
                     "message", ex.getMessage()
@@ -131,7 +119,7 @@ public class IdeDatabaseFacade {
      * @param overrideScope  数据源 scope 覆盖（可为 null，使用全局配置）
      * @return 采样结果 Map，包含 totalTablesFound / sampledCount / tables
      */
-    public Map<String, Object> sampleSchema(
+    public Map<String, Object> listTableSchema(
             String projectHint,
             String dataSourceName,
             String catalog,
@@ -188,8 +176,8 @@ public class IdeDatabaseFacade {
         }
 
         Object dataSource = resolveRequiredDataSource(projectHint, dataSourceName, overrideScope);
-        String url = DbReflectionUtil.invokeString(dataSource, "getUrl");
-        String driverClass = DbReflectionUtil.invokeString(dataSource, "getDriverClass");
+        String url = DataSourceTypeUtil.resolveDataSourceUrl(dataSource);
+        String driverClass = DataSourceTypeUtil.resolveDataSourceDriverClass(dataSource);
         String dataSourceType = DataSourceTypeUtil.inferDataSourceType(dataSource, url, driverClass);
         return executeStatementInternal(
                 dataSource,
@@ -266,19 +254,17 @@ public class IdeDatabaseFacade {
 
     private Map<String, Object> mapDataSourceRow(DataSourceDiscoveryUtil.ScopedDataSource scoped) {
         Object ds = scoped.delegate();
-        String name = DbReflectionUtil.invokeString(ds, "getName");
-        String url = DbReflectionUtil.invokeString(ds, "getUrl");
-        String driver = DbReflectionUtil.invokeString(ds, "getDriverClass");
+        String url = DataSourceTypeUtil.resolveDataSourceUrl(ds);
+        String driverClass = DataSourceTypeUtil.resolveDataSourceDriverClass(ds);
         Map<String, Object> row = new HashMap<>();
-        row.put("name", name);
+        row.put("name", DataSourceTypeUtil.resolveDataSourceName(ds));
         row.put("url", url);
-        row.put("driverClass", driver);
-        row.put("type", DataSourceTypeUtil.inferDataSourceType(ds, url, driver));
+        row.put("driverClass", driverClass);
+        row.put("type", DataSourceTypeUtil.inferDataSourceType(ds, url, driverClass));
         row.put("scope", scoped.scope().name());
-        row.put("version", DataSourceTypeUtil.resolveDataSourceVersion(ds, url, driver));
+        row.put("version", DataSourceTypeUtil.resolveDataSourceVersion(ds, url, driverClass));
         return row;
     }
-
 
     private McpSettingsState.DataSourceScope resolveScope(McpSettingsState.DataSourceScope overrideScope) {
         return overrideScope == null ? McpSettingsState.getInstance().getDataSourceScope() : overrideScope;
@@ -303,7 +289,7 @@ public class IdeDatabaseFacade {
     private Object findDataSourceByName(Project project, String name, McpSettingsState.DataSourceScope overrideScope) {
         McpSettingsState.DataSourceScope scope = resolveScope(overrideScope);
         for (DataSourceDiscoveryUtil.ScopedDataSource scoped : discoveryUtil.findScopedDataSources(project, scope)) {
-            String dsName = DbReflectionUtil.invokeString(scoped.delegate(), "getName");
+            String dsName = DataSourceTypeUtil.resolveDataSourceName(scoped.delegate());
             if (Objects.equals(dsName, name)) {
                 return scoped.delegate();
             }
@@ -325,14 +311,4 @@ public class IdeDatabaseFacade {
         return (value == null || value.isBlank()) ? null : value;
     }
 
-    private enum SqlMode {
-        QUERY,
-        DML,
-        DDL
-    }
-
-    private enum NoSqlMode {
-        QUERY,
-        WRITE_DELETE
-    }
 }

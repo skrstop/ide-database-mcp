@@ -38,7 +38,7 @@ public final class McpProtocolRouter {
                 default -> error(id, -32601, "Method not found: " + method);
             };
         } catch (Exception ex) {
-            logError("Protocol handle failed: " + ex.getMessage());
+            McpRuntimeLogService.logError("router", "Protocol handle failed: " + ex.getMessage());
             return error(null, -32603, "Internal error: " + ex.getMessage());
         } finally {
             recordInvocation(methodKey, System.nanoTime() - startNanos);
@@ -67,7 +67,7 @@ public final class McpProtocolRouter {
                     String project = args.has("project") ? args.get("project").getAsString() : "";
                     McpSettingsState.DataSourceScope scope = parseScopeArg(args);
                     List<Map<String, Object>> dataSources = databaseFacade.listDataSources(project, scope);
-                    logInfo("Executed tool " + McpToolDefinitions.TOOL_LIST_DATASOURCES);
+                    McpRuntimeLogService.logInfo("router", "Executed tool " + McpToolDefinitions.TOOL_LIST_DATASOURCES);
                     yield ok(id, mcpToolResult(dataSources));
                 }
                 case McpToolDefinitions.TOOL_LIST_DATABASES -> {
@@ -75,7 +75,7 @@ public final class McpProtocolRouter {
                     String dataSource = requiredString(args, "dataSource");
                     McpSettingsState.DataSourceScope scope = parseScopeArg(args);
                     List<Map<String, Object>> databases = databaseFacade.listDatabases(project, dataSource, scope);
-                    logInfo("Executed tool " + McpToolDefinitions.TOOL_LIST_DATABASES + " on data source: " + dataSource);
+                    McpRuntimeLogService.logInfo("router", "Executed tool " + McpToolDefinitions.TOOL_LIST_DATABASES + " on data source: " + dataSource);
                     yield ok(id, mcpToolResult(databases));
                 }
                 case McpToolDefinitions.TOOL_EXECUTE_SQL_QUERY -> {
@@ -85,7 +85,7 @@ public final class McpProtocolRouter {
                     int maxRows = args.has("maxRows") ? args.get("maxRows").getAsInt() : 200;
                     McpSettingsState.DataSourceScope scope = parseScopeArg(args);
                     Map<String, Object> queryResult = databaseFacade.executeQuerySql(project, dataSource, sql, maxRows, scope);
-                    logInfo("Executed tool " + McpToolDefinitions.TOOL_EXECUTE_SQL_QUERY + " on data source: " + dataSource);
+                    McpRuntimeLogService.logInfo("router", "Executed tool " + McpToolDefinitions.TOOL_EXECUTE_SQL_QUERY + " on data source: " + dataSource);
                     yield ok(id, mcpToolResult(queryResult));
                 }
                 case McpToolDefinitions.TOOL_EXECUTE_SQL_DML -> {
@@ -94,7 +94,7 @@ public final class McpProtocolRouter {
                     String sql = requiredString(args, "sql");
                     McpSettingsState.DataSourceScope scope = parseScopeArg(args);
                     Map<String, Object> dmlResult = databaseFacade.executeDmlSql(project, dataSource, sql, scope);
-                    logInfo("Executed tool " + McpToolDefinitions.TOOL_EXECUTE_SQL_DML + " on data source: " + dataSource);
+                    McpRuntimeLogService.logInfo("router", "Executed tool " + McpToolDefinitions.TOOL_EXECUTE_SQL_DML + " on data source: " + dataSource);
                     yield ok(id, mcpToolResult(dmlResult));
                 }
                 case McpToolDefinitions.TOOL_EXECUTE_SQL_DDL -> {
@@ -103,7 +103,7 @@ public final class McpProtocolRouter {
                     String sql = requiredString(args, "sql");
                     McpSettingsState.DataSourceScope scope = parseScopeArg(args);
                     Map<String, Object> ddlResult = databaseFacade.executeDdlSql(project, dataSource, sql, scope);
-                    logInfo("Executed tool " + McpToolDefinitions.TOOL_EXECUTE_SQL_DDL + " on data source: " + dataSource);
+                    McpRuntimeLogService.logInfo("router", "Executed tool " + McpToolDefinitions.TOOL_EXECUTE_SQL_DDL + " on data source: " + dataSource);
                     yield ok(id, mcpToolResult(ddlResult));
                 }
                 case McpToolDefinitions.TOOL_EXECUTE_NOSQL_QUERY -> {
@@ -113,7 +113,7 @@ public final class McpProtocolRouter {
                     int maxRows = args.has("maxRows") ? args.get("maxRows").getAsInt() : 200;
                     McpSettingsState.DataSourceScope scope = parseScopeArg(args);
                     Map<String, Object> noSqlQueryResult = databaseFacade.executeNoSqlQuery(project, dataSource, statement, maxRows, scope);
-                    logInfo("Executed tool " + McpToolDefinitions.TOOL_EXECUTE_NOSQL_QUERY + " on data source: " + dataSource);
+                    McpRuntimeLogService.logInfo("router", "Executed tool " + McpToolDefinitions.TOOL_EXECUTE_NOSQL_QUERY + " on data source: " + dataSource);
                     yield ok(id, mcpToolResult(noSqlQueryResult));
                 }
                 case McpToolDefinitions.TOOL_EXECUTE_NOSQL_WRITE_DELETE -> {
@@ -122,7 +122,7 @@ public final class McpProtocolRouter {
                     String statement = requiredString(args, "statement");
                     McpSettingsState.DataSourceScope scope = parseScopeArg(args);
                     Map<String, Object> noSqlWriteResult = databaseFacade.executeNoSqlWriteDelete(project, dataSource, statement, scope);
-                    logInfo("Executed tool " + McpToolDefinitions.TOOL_EXECUTE_NOSQL_WRITE_DELETE + " on data source: " + dataSource);
+                    McpRuntimeLogService.logInfo("router", "Executed tool " + McpToolDefinitions.TOOL_EXECUTE_NOSQL_WRITE_DELETE + " on data source: " + dataSource);
                     yield ok(id, mcpToolResult(noSqlWriteResult));
                 }
                 case McpToolDefinitions.TOOL_LIST_TABLE_SCHEMA -> {
@@ -135,17 +135,17 @@ public final class McpProtocolRouter {
                     int maxTables = args.has("maxTables") ? args.get("maxTables").getAsInt() : 20;
                     boolean includeIndexes = args.has("includeIndexes") && args.get("includeIndexes").getAsBoolean();
                     McpSettingsState.DataSourceScope scope = parseScopeArg(args);
-                    Map<String, Object> sampleResult = databaseFacade.sampleSchema(
+                    Map<String, Object> sampleResult = databaseFacade.listTableSchema(
                             project, dataSource, catalog, schema, keywords, tablePrefix, maxTables, includeIndexes, scope
                     );
-                    logInfo("Executed tool " + McpToolDefinitions.TOOL_LIST_TABLE_SCHEMA
+                    McpRuntimeLogService.logInfo("router", "Executed tool " + McpToolDefinitions.TOOL_LIST_TABLE_SCHEMA
                             + " on data source: " + dataSource + ", sampled=" + sampleResult.get("sampledCount"));
                     yield ok(id, mcpToolResult(sampleResult));
                 }
                 default -> error(id, -32602, "Unsupported tool: " + toolName);
             };
         } catch (Exception ex) {
-            logError("Tool call failed: " + toolName + ", error=" + ex.getMessage());
+            McpRuntimeLogService.logError("router", "Tool call failed: " + toolName + ", error=" + ex.getMessage());
             return error(id, -32000, ex.getMessage());
         } finally {
             recordInvocation("tool:" + toolName, System.nanoTime() - startNanos);
@@ -181,7 +181,7 @@ public final class McpProtocolRouter {
         }
 
         long count = metricsService.record(key, elapsedNanos);
-        logInfo("Invocation recorded: " + key + " count=" + count);
+        McpRuntimeLogService.logInfo("router", "Invocation recorded: " + key + " count=" + count);
     }
 
     private String requiredString(JsonObject args, String field) {
@@ -255,26 +255,6 @@ public final class McpProtocolRouter {
                 : ApplicationManager.getApplication().getService(McpMethodMetricsService.class);
     }
 
-    private McpRuntimeLogService logService() {
-        return ApplicationManager.getApplication() == null
-                ? null
-                : ApplicationManager.getApplication().getService(McpRuntimeLogService.class);
-    }
-
-    private void logInfo(String message) {
-        McpRuntimeLogService service = logService();
-        if (service != null) {
-            service.info("router", message);
-        }
-    }
-
-
-    private void logError(String message) {
-        McpRuntimeLogService service = logService();
-        if (service != null) {
-            service.error("router", message);
-        }
-    }
 
     private Map<String, Object> mcpToolResult(Object value) {
         Map<String, Object> result = new HashMap<>();

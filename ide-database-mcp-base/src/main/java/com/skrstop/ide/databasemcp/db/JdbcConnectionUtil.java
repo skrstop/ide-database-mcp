@@ -1,7 +1,7 @@
 package com.skrstop.ide.databasemcp.db;
 
-import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.PathManager;
+import com.skrstop.ide.databasemcp.entity.DriverShim;
 import com.skrstop.ide.databasemcp.service.McpRuntimeLogService;
 
 import java.lang.reflect.Method;
@@ -9,7 +9,10 @@ import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.sql.*;
+import java.sql.Connection;
+import java.sql.Driver;
+import java.sql.DriverManager;
+import java.sql.SQLException;
 import java.util.Iterator;
 import java.util.Locale;
 import java.util.Properties;
@@ -20,34 +23,12 @@ final class JdbcConnectionUtil {
     JdbcConnectionUtil() {
     }
 
-    private static McpRuntimeLogService logService() {
-        return ApplicationManager.getApplication() == null
-                ? null
-                : ApplicationManager.getApplication().getService(McpRuntimeLogService.class);
-    }
-
-    private static void logInfo(String message) {
-        McpRuntimeLogService service = logService();
-        if (service != null) {
-            service.info("jdbc", message);
-        }
-    }
-
-    private static void logWarn(String message) {
-        McpRuntimeLogService service = logService();
-        if (service != null) {
-            service.warn("jdbc", message);
-        }
-    }
 
     Connection openConnection(Object dataSource, String dataSourceName) throws Exception {
-        String url = DbReflectionUtil.invokeString(dataSource, "getUrl");
-        String user = DbReflectionUtil.invokeString(dataSource, "getUser");
-        if (user == null || user.isBlank()) {
-            user = DbReflectionUtil.invokeString(dataSource, "getUsername");
-        }
+        String url = DataSourceTypeUtil.resolveDataSourceUrl(dataSource);
+        String user = DataSourceTypeUtil.resolveDataSourceUserName(dataSource);
         String password = loadPasswordViaIdeaCredentials(dataSource);
-        String driverClass = DbReflectionUtil.invokeString(dataSource, "getDriverClass");
+        String driverClass = DataSourceTypeUtil.resolveDataSourceDriverClass(dataSource);
 
         if (url == null || url.isBlank()) {
             throw new IllegalStateException("Data source URL is empty: " + dataSourceName);
@@ -57,7 +38,7 @@ final class JdbcConnectionUtil {
             try {
                 Class.forName(driverClass);
             } catch (ClassNotFoundException ex) {
-                logWarn("JDBC driver class not found: " + driverClass + ", " + ex.getMessage());
+                McpRuntimeLogService.logWarn("jdbc", "JDBC driver class not found: " + driverClass + ", " + ex.getMessage());
             }
         }
 
@@ -126,7 +107,7 @@ final class JdbcConnectionUtil {
         } catch (ClassNotFoundException ignored) {
             return null;
         } catch (Exception ex) {
-            logInfo("Failed to load password via IDE credentials: " + ex.getMessage());
+            McpRuntimeLogService.logInfo("jdbc", "Failed to load password via IDE credentials: " + ex.getMessage());
             return null;
         }
     }
@@ -158,12 +139,12 @@ final class JdbcConnectionUtil {
                 Object instance = loaded.getDeclaredConstructor().newInstance();
                 if (instance instanceof Driver driver) {
                     DriverManager.registerDriver(new DriverShim(driver));
-                    logInfo("Registered JDBC driver " + driverClass + " from " + jar);
+                    McpRuntimeLogService.logInfo("jdbc", "Registered JDBC driver " + driverClass + " from " + jar);
                     return true;
                 }
             }
         } catch (Exception e) {
-            logWarn("Failed to register JDBC driver from IDE jdbc-drivers: " + driverClass + ", " + e.getMessage());
+            McpRuntimeLogService.logWarn("jdbc", "Failed to register JDBC driver from IDE jdbc-drivers: " + driverClass + ", " + e.getMessage());
         }
         return false;
     }
@@ -176,47 +157,5 @@ final class JdbcConnectionUtil {
         }
     }
 
-    private static final class DriverShim implements Driver {
-        private final Driver delegate;
-
-        private DriverShim(Driver delegate) {
-            this.delegate = delegate;
-        }
-
-        @Override
-        public Connection connect(String url, Properties info) throws SQLException {
-            return delegate.connect(url, info);
-        }
-
-        @Override
-        public boolean acceptsURL(String url) throws SQLException {
-            return delegate.acceptsURL(url);
-        }
-
-        @Override
-        public DriverPropertyInfo[] getPropertyInfo(String url, Properties info) throws SQLException {
-            return delegate.getPropertyInfo(url, info);
-        }
-
-        @Override
-        public int getMajorVersion() {
-            return delegate.getMajorVersion();
-        }
-
-        @Override
-        public int getMinorVersion() {
-            return delegate.getMinorVersion();
-        }
-
-        @Override
-        public boolean jdbcCompliant() {
-            return delegate.jdbcCompliant();
-        }
-
-        @Override
-        public java.util.logging.Logger getParentLogger() throws SQLFeatureNotSupportedException {
-            return delegate.getParentLogger();
-        }
-    }
 }
 

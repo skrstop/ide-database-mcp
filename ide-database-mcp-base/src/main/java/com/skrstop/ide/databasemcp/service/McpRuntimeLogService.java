@@ -34,6 +34,53 @@ public final class McpRuntimeLogService {
         return ApplicationManager.getApplication().getService(McpRuntimeLogService.class);
     }
 
+    /**
+     * null-safe 安全获取实例（ApplicationManager 未初始化时返回 null）。
+     */
+    private static McpRuntimeLogService safeGetInstance() {
+        com.intellij.openapi.application.Application app = ApplicationManager.getApplication();
+        return app == null ? null : app.getService(McpRuntimeLogService.class);
+    }
+
+    /**
+     * 静态 info 日志入口，null-safe，可在任意类直接调用无需持有实例。
+     *
+     * @param source  日志来源标签（如 "jdbc"、"discovery" 等）
+     * @param message 日志内容
+     */
+    public static void logInfo(String source, String message) {
+        McpRuntimeLogService svc = safeGetInstance();
+        if (svc != null) {
+            svc.info(source, message);
+        }
+    }
+
+    /**
+     * 静态 warn 日志入口，null-safe。
+     *
+     * @param source  日志来源标签
+     * @param message 日志内容
+     */
+    public static void logWarn(String source, String message) {
+        McpRuntimeLogService svc = safeGetInstance();
+        if (svc != null) {
+            svc.warn(source, message);
+        }
+    }
+
+    /**
+     * 静态 error 日志入口，null-safe。
+     *
+     * @param source  日志来源标签
+     * @param message 日志内容
+     */
+    public static void logError(String source, String message) {
+        McpRuntimeLogService svc = safeGetInstance();
+        if (svc != null) {
+            svc.error(source, message);
+        }
+    }
+
     // Helper methods to get config values from settings
     private int getMaxEntries() {
         return McpSettingsState.getInstance().getMaxEntries();
