@@ -133,10 +133,11 @@ public final class McpProtocolRouter {
                     List<String> keywords = parseStringArray(args, "keywords");
                     String tablePrefix = args.has("tablePrefix") ? args.get("tablePrefix").getAsString() : null;
                     int maxTables = args.has("maxTables") ? args.get("maxTables").getAsInt() : 20;
+                    boolean includeColumns = args.has("includeColumns") && args.get("includeColumns").getAsBoolean();
                     boolean includeIndexes = args.has("includeIndexes") && args.get("includeIndexes").getAsBoolean();
                     McpSettingsState.DataSourceScope scope = parseScopeArg(args);
                     Map<String, Object> sampleResult = databaseFacade.listTableSchema(
-                            project, dataSource, catalog, schema, keywords, tablePrefix, maxTables, includeIndexes, scope
+                            project, dataSource, catalog, schema, keywords, tablePrefix, maxTables, includeColumns, includeIndexes, scope
                     );
                     McpRuntimeLogService.logInfo("router", "Executed tool " + McpToolDefinitions.TOOL_LIST_TABLE_SCHEMA
                             + " on data source: " + dataSource + ", sampled=" + sampleResult.get("sampledCount"));

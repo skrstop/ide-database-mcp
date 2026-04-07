@@ -126,11 +126,13 @@ class DatabaseMcpToolset : McpToolset {
         keywords: List<String>?,
         tablePrefix: String?,
         maxTables: Int?,
+        includeColumns: Boolean?,
         includeIndexes: Boolean?
     ): String {
         requireText(dataSource, "dataSource")
         val resolvedScope = parseScope(scope)
         val effectiveMaxTables = maxTables ?: 20
+        val effectiveIncludeColumns = includeColumns ?: false
         val effectiveIncludeIndexes = includeIndexes ?: false
         val result = facade.listTableSchema(
             resolveProjectHint(project),
@@ -140,6 +142,7 @@ class DatabaseMcpToolset : McpToolset {
             keywords ?: emptyList(),
             tablePrefix,
             effectiveMaxTables,
+            effectiveIncludeColumns,
             effectiveIncludeIndexes,
             resolvedScope
         )

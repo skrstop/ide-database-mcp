@@ -115,6 +115,7 @@ public class IdeDatabaseFacade {
      * @param keywords       相关性关键词列表（可为 null 或空）
      * @param tablePrefix    表名前缀过滤（可为 null）
      * @param maxTables      最多返回表数量，默认 20，范围 1-200
+     * @param includeColumns 是否在结果中附带列（字段）详情，默认 false 时仅返回 columnCount
      * @param includeIndexes 是否附带索引信息
      * @param overrideScope  数据源 scope 覆盖（可为 null，使用全局配置）
      * @return 采样结果 Map，包含 totalTablesFound / sampledCount / tables
@@ -127,18 +128,20 @@ public class IdeDatabaseFacade {
             List<String> keywords,
             String tablePrefix,
             int maxTables,
+            boolean includeColumns,
             boolean includeIndexes,
             McpSettingsState.DataSourceScope overrideScope
     ) {
         Object dataSource = resolveRequiredDataSource(projectHint, dataSourceName, overrideScope);
         try (Connection conn = connectionUtil.openConnection(dataSource, dataSourceName)) {
-            return SchemaSmartSampler.sample(
+            return SchemaSmartSampler.listTableSchema(
                     conn,
                     nullIfBlank(catalog),
                     nullIfBlank(schema),
                     keywords != null ? keywords : Collections.emptyList(),
                     nullIfBlank(tablePrefix),
                     Math.max(1, Math.min(200, maxTables)),
+                    includeColumns,
                     includeIndexes
             );
         } catch (Exception ex) {

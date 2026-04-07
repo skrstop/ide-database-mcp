@@ -50,7 +50,10 @@ public final class McpToolDefinitions {
                     "(e.g. 'order', 'user', 'payment') — only the most relevant tables are returned, " +
                     "ranked by keyword matches in table names, column names, and comments, " +
                     "plus foreign-key connectivity. Without keywords the most interconnected (core) tables appear first. " +
-                    "Use catalog/schema/tablePrefix to further narrow the scope.";
+                    "Use catalog/schema/tablePrefix to further narrow the scope. " +
+                    "IMPORTANT: Use 'catalog' and/or 'schema' to specify the target database namespace. " +
+                    "Omitting both causes a full scan across ALL available databases and may result in a timeout. " +
+                    "Do NOT put the database/schema name into 'keywords'; keywords are for table/column name relevance scoring only.";
 
 
     public static final String PARAM_PROJECT_DESC =
@@ -141,12 +144,15 @@ public final class McpToolDefinitions {
                     "- project (optional): " + PARAM_PROJECT_DESC + "\n" +
                     "- scope (optional): " + PARAM_SCOPE_DESC_SHORT + "\n" +
                     "- dataSource (required): " + PARAM_DATASOURCE_DESC + "\n" +
-                    "- catalog (optional): Target catalog/database name to filter tables. Leave blank to use the default.\n" +
-                    "- schema (optional): Target schema name to filter tables. Leave blank to use the default.\n" +
-                    "- keywords (optional): Relevance keywords, e.g. ['order','user','payment']. " +
-                    "Tables/columns whose names or comments match these keywords score higher and appear first.\n" +
+                    "- catalog (optional): Top-level namespace filter (commonly the 'database name' in most drivers). " +
+                    "Specifying this restricts the scan to a single catalog/database; omitting it scans ALL available databases and may cause a timeout.\n" +
+                    "- schema (optional): Second-level namespace filter (called 'schema' in some drivers, same as catalog in others). Leave blank to use the driver default.\n" +
+                    "- keywords (optional): Relevance scoring keywords matched against TABLE names, COLUMN names, and comments. " +
+                    "e.g. ['order','user','payment']. Tables/columns matching these keywords score higher and appear first. " +
+                    "WARNING: Do NOT put the database/catalog/schema name here — use the 'catalog' or 'schema' parameter for namespace filtering.\n" +
                     "- tablePrefix (optional): Only include tables whose names start with this prefix, e.g. 'order_'.\n" +
                     "- maxTables (optional): Maximum number of tables to return. Default: 20, range 1-200.\n" +
+                    "- includeColumns (optional): Whether to include full column details for each table. Default: false — only columnCount is returned. Set to true when you need column names, types, comments, etc.\n" +
                     "- includeIndexes (optional): Whether to include index information for each table. Default: false.";
 
 
@@ -412,16 +418,22 @@ public final class McpToolDefinitions {
                                         )),
                                         Map.entry("catalog", Map.of(
                                                 "type", "string",
-                                                "description", "Target catalog/database name to filter tables. Leave blank for driver default."
+                                                "description", "Top-level namespace filter (commonly the 'database name' in most drivers). " +
+                                                        "Specifying this restricts the scan to a single catalog/database; omitting it scans ALL available databases and may cause a timeout. " +
+                                                        "Do NOT put the database name into 'keywords'.",
+                                                "examples", List.of("my_app_db", "ynw_admin")
                                         )),
                                         Map.entry("schema", Map.of(
                                                 "type", "string",
-                                                "description", "Target schema name to filter tables. Leave blank for driver default."
+                                                "description", "Second-level namespace filter (called 'schema' in some drivers, same as catalog in others). Leave blank to use the driver default.",
+                                                "examples", List.of("public", "dbo")
                                         )),
                                         Map.entry("keywords", Map.of(
                                                 "type", "array",
                                                 "items", Map.of("type", "string"),
-                                                "description", "Relevance keywords. Tables/columns matching these keywords score higher and appear first.",
+                                                "description", "Relevance scoring keywords matched against TABLE names, COLUMN names, and comments. " +
+                                                        "Tables/columns matching these keywords score higher and appear first. " +
+                                                        "WARNING: Do NOT put the database/catalog/schema name here — use 'catalog' or 'schema' for namespace filtering.",
                                                 "examples", List.of(List.of("order", "user", "payment"))
                                         )),
                                         Map.entry("tablePrefix", Map.of(
@@ -435,6 +447,11 @@ public final class McpToolDefinitions {
                                                 "maximum", 200,
                                                 "default", 20,
                                                 "examples", List.of(10, 20, 50)
+                                        )),
+                                        Map.entry("includeColumns", Map.of(
+                                                "type", "boolean",
+                                                "description", "Whether to include full column details (name, type, length, comment, nullable, defaultValue) for each table. Default: false — only columnCount is returned. Set to true when column-level detail is needed.",
+                                                "default", false
                                         )),
                                         Map.entry("includeIndexes", Map.of(
                                                 "type", "boolean",

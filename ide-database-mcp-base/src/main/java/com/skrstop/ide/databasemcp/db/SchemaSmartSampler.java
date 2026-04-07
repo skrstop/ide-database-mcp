@@ -1,5 +1,7 @@
 package com.skrstop.ide.databasemcp.db;
 
+import com.skrstop.ide.databasemcp.entity.ColumnInfo;
+import com.skrstop.ide.databasemcp.entity.TableInfo;
 import com.skrstop.ide.databasemcp.service.McpRuntimeLogService;
 
 import java.sql.Connection;
@@ -66,17 +68,19 @@ final class SchemaSmartSampler {
      * @param keywords       关键词列表，用于相关性评分（可为 null 或空）
      * @param tablePrefix    表名前缀过滤，如 {@code order_}（可为 null）
      * @param maxTables      最多返回的表数量，需大于 0
+     * @param includeColumns 是否在结果中附带列（字段）详情，默认 false 时仅返回 columnCount
      * @param includeIndexes 是否在结果中附带索引信息
      * @return 采样结果，包含 totalTablesFound / sampledCount / tables 等字段
      * @throws SQLException 访问数据库元数据失败时抛出
      */
-    static Map<String, Object> sample(
+    static Map<String, Object> listTableSchema(
             Connection conn,
             String catalogFilter,
             String schemaFilter,
             List<String> keywords,
             String tablePrefix,
             int maxTables,
+            boolean includeColumns,
             boolean includeIndexes
     ) throws SQLException {
         // 1. 加载所有表基本信息
@@ -94,8 +98,11 @@ final class SchemaSmartSampler {
             scoreTableNameAndComment(table, normalizedKeywords, tablePrefix);
         }
 
-        // 4. 加载列信息并叠加列级评分
-        loadColumnsAndScore(conn, allTables, catalogFilter, schemaFilter, normalizedKeywords);
+        // 4. 加载列信息并叠加列级评分（仅在需要列数据或需要对列进行关键词评分时执行）
+        // 两种情况无需加载：没有关键词（列评分无意义）且调用方不需要列详情
+        if (includeColumns || !normalizedKeywords.isEmpty()) {
+            loadColumnsAndScore(conn, allTables, catalogFilter, schemaFilter, normalizedKeywords);
+        }
 
         // 5. 加载外键关系（{源表 -> 引用的目标表集合}）
         Map<String, Set<String>> fkRelations = loadForeignKeyRelations(conn, allTables, catalogFilter, schemaFilter);
@@ -108,7 +115,7 @@ final class SchemaSmartSampler {
 
         // 8. 构建最终输出
         List<Map<String, Object>> tableResults = buildTableResults(
-                sampledTables, includeIndexes, conn, catalogFilter, schemaFilter
+                sampledTables, includeColumns, includeIndexes, conn, catalogFilter, schemaFilter
         );
 
         Map<String, Object> result = new LinkedHashMap<>();
@@ -168,16 +175,16 @@ final class SchemaSmartSampler {
     private static void scoreTableNameAndComment(TableInfo table, List<String> keywords, String tablePrefix) {
         // 前缀精确匹配：即使没有关键词也应加分
         if (tablePrefix != null && !tablePrefix.isBlank()
-                && table.tableName.toLowerCase(Locale.ROOT).startsWith(tablePrefix.toLowerCase(Locale.ROOT))) {
-            table.score += SCORE_PREFIX_MATCH;
+                && table.getTableName().toLowerCase(Locale.ROOT).startsWith(tablePrefix.toLowerCase(Locale.ROOT))) {
+            table.setScore(table.getScore() + SCORE_PREFIX_MATCH);
         }
 
         for (String keyword : keywords) {
-            if (containsIgnoreCase(table.tableName, keyword)) {
-                table.score += SCORE_TABLE_NAME_KEYWORD;
+            if (containsIgnoreCase(table.getTableName(), keyword)) {
+                table.setScore(table.getScore() + SCORE_TABLE_NAME_KEYWORD);
             }
-            if (containsIgnoreCase(table.comment, keyword)) {
-                table.score += SCORE_TABLE_COMMENT_KEYWORD;
+            if (containsIgnoreCase(table.getComment(), keyword)) {
+                table.setScore(table.getScore() + SCORE_TABLE_COMMENT_KEYWORD);
             }
         }
     }
@@ -194,9 +201,9 @@ final class SchemaSmartSampler {
     ) throws SQLException {
         DatabaseMetaData meta = conn.getMetaData();
         for (TableInfo table : tables) {
-            String effectiveCatalog = catalogFilter != null ? catalogFilter : table.catalog;
-            String effectiveSchema = schemaFilter != null ? schemaFilter : table.schema;
-            try (ResultSet rs = meta.getColumns(effectiveCatalog, effectiveSchema, table.tableName, null)) {
+            String effectiveCatalog = catalogFilter != null ? catalogFilter : table.getCatalog();
+            String effectiveSchema = schemaFilter != null ? schemaFilter : table.getSchema();
+            try (ResultSet rs = meta.getColumns(effectiveCatalog, effectiveSchema, table.getTableName(), null)) {
                 while (rs.next()) {
                     String columnName = rs.getString("COLUMN_NAME");
                     if (columnName == null || columnName.isBlank()) {
@@ -215,19 +222,19 @@ final class SchemaSmartSampler {
                     int ordinalPosition = safeGetInt(rs, "ORDINAL_POSITION");
 
                     ColumnInfo col = new ColumnInfo(columnName, typeName, columnSize, comment, nullable, defaultValue, ordinalPosition);
-                    table.columns.add(col);
+                    table.getColumns().add(col);
 
                     for (String keyword : keywords) {
                         if (containsIgnoreCase(columnName, keyword)) {
-                            table.score += SCORE_COLUMN_NAME_KEYWORD;
+                            table.setScore(table.getScore() + SCORE_COLUMN_NAME_KEYWORD);
                         }
                         if (containsIgnoreCase(comment, keyword)) {
-                            table.score += SCORE_COLUMN_COMMENT_KEYWORD;
+                            table.setScore(table.getScore() + SCORE_COLUMN_COMMENT_KEYWORD);
                         }
                     }
                 }
             } catch (Exception e) {
-                McpRuntimeLogService.logWarn("sampler", "加载表 [" + table.tableName + "] 列信息失败: " + e.getMessage());
+                McpRuntimeLogService.logWarn("sampler", "加载表 [" + table.getTableName() + "] 列信息失败: " + e.getMessage());
             }
         }
     }
@@ -253,17 +260,17 @@ final class SchemaSmartSampler {
         }
 
         for (TableInfo table : tables) {
-            String effectiveCatalog = catalogFilter != null ? catalogFilter : table.catalog;
-            String effectiveSchema = schemaFilter != null ? schemaFilter : table.schema;
-            try (ResultSet rs = meta.getImportedKeys(effectiveCatalog, effectiveSchema, table.tableName)) {
+            String effectiveCatalog = catalogFilter != null ? catalogFilter : table.getCatalog();
+            String effectiveSchema = schemaFilter != null ? schemaFilter : table.getSchema();
+            try (ResultSet rs = meta.getImportedKeys(effectiveCatalog, effectiveSchema, table.getTableName())) {
                 while (rs.next()) {
                     String pkTable = safeGetString(rs, "PKTABLE_NAME");
                     if (pkTable != null && !pkTable.isBlank()) {
-                        relations.computeIfAbsent(table.tableName, k -> new LinkedHashSet<>()).add(pkTable);
+                        relations.computeIfAbsent(table.getTableName(), k -> new LinkedHashSet<>()).add(pkTable);
                     }
                 }
             } catch (Exception e) {
-                McpRuntimeLogService.logInfo("sampler", "加载表 [" + table.tableName + "] 外键失败（已跳过）: " + e.getMessage());
+                McpRuntimeLogService.logInfo("sampler", "加载表 [" + table.getTableName() + "] 外键失败（已跳过）: " + e.getMessage());
             }
         }
         return relations;
@@ -280,8 +287,8 @@ final class SchemaSmartSampler {
             }
         }
         for (TableInfo table : tables) {
-            int refCount = referenceCount.getOrDefault(table.tableName, 0);
-            table.score += refCount * SCORE_FK_REFERENCED;
+            int refCount = referenceCount.getOrDefault(table.getTableName(), 0);
+            table.setScore(table.getScore() + SCORE_FK_REFERENCED);
         }
     }
 
@@ -298,8 +305,8 @@ final class SchemaSmartSampler {
     ) {
         // 按评分降序排列，同分则按表名升序
         List<TableInfo> sorted = allTables.stream()
-                .sorted(Comparator.comparingInt((TableInfo t) -> t.score).reversed()
-                        .thenComparing(t -> t.tableName))
+                .sorted(Comparator.comparingInt(TableInfo::getScore).reversed()
+                        .thenComparing(TableInfo::getTableName))
                 .toList();
 
         // 取 Top-N
@@ -309,14 +316,14 @@ final class SchemaSmartSampler {
             if (selected.size() >= maxTables) {
                 break;
             }
-            selectedNames.add(t.tableName);
+            selectedNames.add(t.getTableName());
             selected.add(t);
         }
 
         // 关联扩散：仅在有关键词时执行（无关键词时顺序选取即可）
         if (!keywords.isEmpty() && selected.size() < maxTables) {
             Map<String, TableInfo> tableByName = allTables.stream()
-                    .collect(Collectors.toMap(t -> t.tableName, t -> t));
+                    .collect(Collectors.toMap(TableInfo::getTableName, t -> t));
 
             Set<String> frontier = new HashSet<>(selectedNames);
             while (selected.size() < maxTables) {
@@ -336,14 +343,14 @@ final class SchemaSmartSampler {
                 List<TableInfo> expansionSorted = expansion.stream()
                         .map(tableByName::get)
                         .filter(Objects::nonNull)
-                        .sorted(Comparator.comparingInt((TableInfo t) -> t.score).reversed()
-                                .thenComparing(t -> t.tableName))
+                        .sorted(Comparator.comparingInt((TableInfo t) -> t.getScore()).reversed()
+                                .thenComparing(t -> t.getTableName()))
                         .toList();
                 for (TableInfo t : expansionSorted) {
                     if (selected.size() >= maxTables) {
                         break;
                     }
-                    selectedNames.add(t.tableName);
+                    selectedNames.add(t.getTableName());
                     selected.add(t);
                 }
                 frontier = new HashSet<>(expansion);
@@ -358,6 +365,7 @@ final class SchemaSmartSampler {
      */
     private static List<Map<String, Object>> buildTableResults(
             List<TableInfo> tables,
+            boolean includeColumns,
             boolean includeIndexes,
             Connection conn,
             String catalogFilter,
@@ -366,27 +374,29 @@ final class SchemaSmartSampler {
         List<Map<String, Object>> result = new ArrayList<>();
         for (TableInfo table : tables) {
             Map<String, Object> tableMap = new LinkedHashMap<>();
-            tableMap.put("tableName", table.tableName);
-            tableMap.put("comment", table.comment != null ? table.comment : "");
-            tableMap.put("relevanceScore", table.score);
+            tableMap.put("tableName", table.getTableName());
+            tableMap.put("comment", table.getComment() != null ? table.getComment() : "");
+            tableMap.put("relevanceScore", table.getScore());
 
             // 按照 ordinalPosition 排序列
-            List<Map<String, Object>> columns = table.columns.stream()
-                    .sorted(Comparator.comparingInt(c -> c.ordinalPosition))
+            List<Map<String, Object>> columns = table.getColumns().stream()
+                    .sorted(Comparator.comparingInt(c -> c.getOrdinalPosition()))
                     .map(col -> {
                         Map<String, Object> colMap = new LinkedHashMap<>();
-                        colMap.put("name", col.columnName);
-                        colMap.put("type", col.typeName != null ? col.typeName : "UNKNOWN");
-                        colMap.put("size", col.columnSize);
-                        colMap.put("nullable", col.nullable);
-                        colMap.put("defaultValue", col.defaultValue != null ? col.defaultValue : "");
-                        colMap.put("comment", col.comment != null ? col.comment : "");
+                        colMap.put("name", col.getColumnName());
+                        colMap.put("type", col.getTypeName() != null ? col.getTypeName() : "UNKNOWN");
+                        colMap.put("size", col.getColumnSize());
+                        colMap.put("nullable", col.isNullable());
+                        colMap.put("defaultValue", col.getDefaultValue() != null ? col.getDefaultValue() : "");
+                        colMap.put("comment", col.getComment() != null ? col.getComment() : "");
                         return colMap;
                     })
                     .collect(Collectors.toList());
 
-            tableMap.put("columns", columns);
             tableMap.put("columnCount", columns.size());
+            if (includeColumns) {
+                tableMap.put("columns", columns);
+            }
 
             if (includeIndexes) {
                 tableMap.put("indexes", loadIndexes(conn, table, catalogFilter, schemaFilter));
@@ -409,9 +419,9 @@ final class SchemaSmartSampler {
         List<Map<String, Object>> indexes = new ArrayList<>();
         try {
             DatabaseMetaData meta = conn.getMetaData();
-            String effectiveCatalog = catalogFilter != null ? catalogFilter : table.catalog;
-            String effectiveSchema = schemaFilter != null ? schemaFilter : table.schema;
-            try (ResultSet rs = meta.getIndexInfo(effectiveCatalog, effectiveSchema, table.tableName, false, true)) {
+            String effectiveCatalog = catalogFilter != null ? catalogFilter : table.getCatalog();
+            String effectiveSchema = schemaFilter != null ? schemaFilter : table.getSchema();
+            try (ResultSet rs = meta.getIndexInfo(effectiveCatalog, effectiveSchema, table.getTableName(), false, true)) {
                 Map<String, Map<String, Object>> indexMap = new LinkedHashMap<>();
                 while (rs.next()) {
                     String indexName = safeGetString(rs, "INDEX_NAME");
@@ -439,7 +449,7 @@ final class SchemaSmartSampler {
                 indexes.addAll(indexMap.values());
             }
         } catch (Exception e) {
-            McpRuntimeLogService.logInfo("sampler", "加载表 [" + table.tableName + "] 索引失败（已跳过）: " + e.getMessage());
+            McpRuntimeLogService.logInfo("sampler", "加载表 [" + table.getTableName() + "] 索引失败（已跳过）: " + e.getMessage());
         }
         return indexes;
     }
@@ -502,94 +512,4 @@ final class SchemaSmartSampler {
         return result;
     }
 
-    // =========================================================================
-    //  日志辅助方法（统一使用 McpRuntimeLogService，避免直接依赖 IntelliJ Logger）
-    // =========================================================================
-
-
-    // =========================================================================
-    //  内部数据模型
-    // =========================================================================
-
-    /**
-     * 表的元信息，包含评分和列列表。
-     */
-    static final class TableInfo {
-        /**
-         * 表名
-         */
-        final String tableName;
-        /**
-         * 表注释
-         */
-        final String comment;
-        /**
-         * 所属 catalog
-         */
-        final String catalog;
-        /**
-         * 所属 schema
-         */
-        final String schema;
-        /**
-         * 相关性综合评分（越高越优先被采样）
-         */
-        int score;
-        /**
-         * 列信息列表
-         */
-        final List<ColumnInfo> columns = new ArrayList<>();
-
-        TableInfo(String tableName, String comment, String catalog, String schema) {
-            this.tableName = tableName;
-            this.comment = comment;
-            this.catalog = catalog;
-            this.schema = schema;
-        }
-    }
-
-    /**
-     * 列的元信息。
-     */
-    static final class ColumnInfo {
-        /**
-         * 列名
-         */
-        final String columnName;
-        /**
-         * 数据类型名称
-         */
-        final String typeName;
-        /**
-         * 列的精度/长度
-         */
-        final int columnSize;
-        /**
-         * 列注释
-         */
-        final String comment;
-        /**
-         * 是否允许为 NULL
-         */
-        final boolean nullable;
-        /**
-         * 默认值
-         */
-        final String defaultValue;
-        /**
-         * 在表中的排列位置（1-based）
-         */
-        final int ordinalPosition;
-
-        ColumnInfo(String columnName, String typeName, int columnSize, String comment,
-                   boolean nullable, String defaultValue, int ordinalPosition) {
-            this.columnName = columnName;
-            this.typeName = typeName;
-            this.columnSize = columnSize;
-            this.comment = comment;
-            this.nullable = nullable;
-            this.defaultValue = defaultValue;
-            this.ordinalPosition = ordinalPosition;
-        }
-    }
 }

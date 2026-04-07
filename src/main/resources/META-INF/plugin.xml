@@ -15,6 +15,7 @@
             <li><code>database_execute_sql_ddl</code>: execute SQL intended for schema/structure changes.</li>
             <li><code>database_execute_nosql_query</code>: execute NoSQL statements intended for read/query usage.</li>
             <li><code>database_execute_nosql_write_delete</code>: execute NoSQL statements intended for write/delete usage.</li>
+            <li><code>database_list_table_schema</code>: get table and column structure (schema) with relevance-ranked smart sampling — supports catalog/schema namespace filtering, keyword scoring, table prefix filter, and optional index info.</li>
         </ul>
 
         <p><b>Database coverage</b>: <code>database_list_databases</code> works for major SQL engines (MySQL, PostgreSQL, Oracle, SQL Server,
@@ -57,6 +58,7 @@
             <li><code>database_execute_sql_ddl</code>：执行用于模式/结构更改的 SQL。</li>
             <li><code>database_execute_nosql_query</code>：执行用于读/查询用途的 NoSQL 语句。</li>
             <li><code>database_execute_nosql_write_delete</code>：执行用于写入/删除用途的 NoSQL 语句。</li>
+            <li><code>database_list_table_schema</code>：获取数据库表与列结构（Schema），支持命名空间过滤（catalog / schema）、关键词相关性评分采样、表名前缀过滤及可选索引信息返回。</li>
         </ul>
 
         <p><b>网络与隐私声明</b>：</p>
@@ -78,6 +80,7 @@
     <change-notes><![CDATA[
         <b>0.1.5</b>
         <ul>
+            <li>New tool: <code>database_list_table_schema</code> — smart schema sampling with relevance ranking. Supports catalog/schema namespace filtering, keyword scoring on table/column names and comments, table prefix filter, configurable max-table count (1–200), and optional index info.</li>
             <li>Privacy: Added explicit network and data handling disclosures in plugin description per Marketplace guidelines.</li>
             <li>Improved MCP server graceful shutdown handling on IDE exit.</li>
             <li>Enhanced <code>database_list_datasources</code>: now returns <code>databaseVersion</code> for each data source.</li>
