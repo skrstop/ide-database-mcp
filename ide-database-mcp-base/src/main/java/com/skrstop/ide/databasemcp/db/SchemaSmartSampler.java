@@ -173,17 +173,21 @@ final class SchemaSmartSampler {
      * @param tablePrefix 表名前缀过滤词
      */
     private static void scoreTableNameAndComment(TableInfo table, List<String> keywords, String tablePrefix) {
+        String tableNameLower = table.getTableName().toLowerCase(Locale.ROOT);
+
         // 前缀精确匹配：即使没有关键词也应加分
         if (tablePrefix != null && !tablePrefix.isBlank()
-                && table.getTableName().toLowerCase(Locale.ROOT).startsWith(tablePrefix.toLowerCase(Locale.ROOT))) {
+                && tableNameLower.startsWith(tablePrefix.toLowerCase(Locale.ROOT))) {
             table.setScore(table.getScore() + SCORE_PREFIX_MATCH);
         }
 
+        String commentLower = table.getComment() != null ? table.getComment().toLowerCase(Locale.ROOT) : null;
+
         for (String keyword : keywords) {
-            if (containsIgnoreCase(table.getTableName(), keyword)) {
+            if (tableNameLower.contains(keyword)) {
                 table.setScore(table.getScore() + SCORE_TABLE_NAME_KEYWORD);
             }
-            if (containsIgnoreCase(table.getComment(), keyword)) {
+            if (commentLower != null && commentLower.contains(keyword)) {
                 table.setScore(table.getScore() + SCORE_TABLE_COMMENT_KEYWORD);
             }
         }
@@ -224,11 +228,15 @@ final class SchemaSmartSampler {
                     ColumnInfo col = new ColumnInfo(columnName, typeName, columnSize, comment, nullable, defaultValue, ordinalPosition);
                     table.getColumns().add(col);
 
+                    // 缓存列名和注释的小写形式，避免在关键词循环中重复 toLowerCase
+                    String columnNameLower = columnName.toLowerCase(Locale.ROOT);
+                    String commentLower = comment != null ? comment.toLowerCase(Locale.ROOT) : null;
+
                     for (String keyword : keywords) {
-                        if (containsIgnoreCase(columnName, keyword)) {
+                        if (columnNameLower.contains(keyword)) {
                             table.setScore(table.getScore() + SCORE_COLUMN_NAME_KEYWORD);
                         }
-                        if (containsIgnoreCase(comment, keyword)) {
+                        if (commentLower != null && commentLower.contains(keyword)) {
                             table.setScore(table.getScore() + SCORE_COLUMN_COMMENT_KEYWORD);
                         }
                     }
@@ -288,7 +296,7 @@ final class SchemaSmartSampler {
         }
         for (TableInfo table : tables) {
             int refCount = referenceCount.getOrDefault(table.getTableName(), 0);
-            table.setScore(table.getScore() + SCORE_FK_REFERENCED);
+            table.setScore(table.getScore() + SCORE_FK_REFERENCED * refCount);
         }
     }
 
@@ -378,23 +386,24 @@ final class SchemaSmartSampler {
             tableMap.put("comment", table.getComment() != null ? table.getComment() : "");
             tableMap.put("relevanceScore", table.getScore());
 
-            // 按照 ordinalPosition 排序列
-            List<Map<String, Object>> columns = table.getColumns().stream()
-                    .sorted(Comparator.comparingInt(c -> c.getOrdinalPosition()))
-                    .map(col -> {
-                        Map<String, Object> colMap = new LinkedHashMap<>();
-                        colMap.put("name", col.getColumnName());
-                        colMap.put("type", col.getTypeName() != null ? col.getTypeName() : "UNKNOWN");
-                        colMap.put("size", col.getColumnSize());
-                        colMap.put("nullable", col.isNullable());
-                        colMap.put("defaultValue", col.getDefaultValue() != null ? col.getDefaultValue() : "");
-                        colMap.put("comment", col.getComment() != null ? col.getComment() : "");
-                        return colMap;
-                    })
-                    .collect(Collectors.toList());
+            List<ColumnInfo> rawColumns = table.getColumns();
+            tableMap.put("columnCount", rawColumns.size());
 
-            tableMap.put("columnCount", columns.size());
+            // 仅在需要列详情时才构建列 Map 列表，避免不必要的对象分配与排序
             if (includeColumns) {
+                List<Map<String, Object>> columns = rawColumns.stream()
+                        .sorted(Comparator.comparingInt(ColumnInfo::getOrdinalPosition))
+                        .map(col -> {
+                            Map<String, Object> colMap = new LinkedHashMap<>();
+                            colMap.put("name", col.getColumnName());
+                            colMap.put("type", col.getTypeName() != null ? col.getTypeName() : "UNKNOWN");
+                            colMap.put("size", col.getColumnSize());
+                            colMap.put("nullable", col.isNullable());
+                            colMap.put("defaultValue", col.getDefaultValue() != null ? col.getDefaultValue() : "");
+                            colMap.put("comment", col.getComment() != null ? col.getComment() : "");
+                            return colMap;
+                        })
+                        .collect(Collectors.toList());
                 tableMap.put("columns", columns);
             }
 
@@ -465,16 +474,6 @@ final class SchemaSmartSampler {
                 .filter(k -> k != null && !k.isBlank())
                 .map(k -> k.trim().toLowerCase(Locale.ROOT))
                 .toList();
-    }
-
-    /**
-     * 不区分大小写地判断目标字符串是否包含关键词。
-     */
-    private static boolean containsIgnoreCase(String target, String keyword) {
-        if (target == null || keyword == null) {
-            return false;
-        }
-        return target.toLowerCase(Locale.ROOT).contains(keyword);
     }
 
     /**

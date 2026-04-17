@@ -78,6 +78,12 @@
     ]]></description>
 
     <change-notes><![CDATA[
+        <b>0.1.6</b>
+        <ul>
+            <li>修复若干已知问题，提升整体稳定性。</li>
+            <li>全面优化性能，降低 CPU 占用并提升 ToolWindow 响应速度。</li>
+        </ul>
+
         <b>0.1.5</b>
         <ul>
             <li>New tool: <code>database_list_table_schema</code> — smart schema sampling with relevance ranking. Supports catalog/schema namespace filtering, keyword scoring on table/column names and comments, table prefix filter, configurable max-table count (1–200), and optional index info.</li>

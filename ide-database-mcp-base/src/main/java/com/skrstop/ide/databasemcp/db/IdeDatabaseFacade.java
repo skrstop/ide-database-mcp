@@ -244,10 +244,15 @@ public class IdeDatabaseFacade {
         try (ResultSet resultSet = rs) {
             ResultSetMetaData md = resultSet.getMetaData();
             int columns = md.getColumnCount();
+            // 预先缓存列标签，避免在 while 循环内对每行重复调用 getColumnLabel(i)
+            String[] labels = new String[columns];
+            for (int i = 0; i < columns; i++) {
+                labels[i] = md.getColumnLabel(i + 1);
+            }
             while (resultSet.next()) {
-                Map<String, Object> row = new HashMap<>();
-                for (int i = 1; i <= columns; i++) {
-                    row.put(md.getColumnLabel(i), resultSet.getObject(i));
+                Map<String, Object> row = new HashMap<>(columns * 2);
+                for (int i = 0; i < columns; i++) {
+                    row.put(labels[i], resultSet.getObject(i + 1));
                 }
                 rows.add(row);
             }

@@ -156,7 +156,17 @@ public final class McpToolDefinitions {
                     "- includeIndexes (optional): Whether to include index information for each table. Default: false.";
 
 
+    /**
+     * 工具定义列表在类加载时一次性构建，后续所有 tools/list 请求直接复用。
+     * 避免每次请求都重建数百个嵌套 Map 对象，降低 GC 压力。
+     */
+    private static final List<Map<String, Object>> CACHED_TOOLS = buildTools();
+
     public static List<Map<String, Object>> getTools() {
+        return CACHED_TOOLS;
+    }
+
+    private static List<Map<String, Object>> buildTools() {
         return List.of(
                 Map.of(
                         "name", TOOL_LIST_DATASOURCES,

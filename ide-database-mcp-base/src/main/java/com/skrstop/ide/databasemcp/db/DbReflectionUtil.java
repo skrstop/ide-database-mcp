@@ -4,8 +4,29 @@ import com.skrstop.ide.databasemcp.service.McpRuntimeLogService;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 final class DbReflectionUtil {
+    /**
+     * 反射 Method 缓存，避免高频调用 getMethod() 的开销。
+     * Key: "类全限定名#方法名", Value: 缓存的 Method（null 用 Optional 包装或用 sentinel）
+     */
+    private static final Map<String, Method> METHOD_CACHE = new ConcurrentHashMap<>();
+
+    /**
+     * 用于标记方法不存在的占位对象，区分"未缓存"和"缓存了不存在"
+     */
+    private static final Method METHOD_NOT_FOUND_SENTINEL;
+
+    static {
+        try {
+            METHOD_NOT_FOUND_SENTINEL = Object.class.getMethod("hashCode");
+        } catch (NoSuchMethodException e) {
+            throw new ExceptionInInitializerError(e);
+        }
+    }
+
     private DbReflectionUtil() {
     }
 
@@ -15,7 +36,17 @@ final class DbReflectionUtil {
      */
     static String invokeString(Object target, String methodName) {
         try {
-            Method method = target.getClass().getMethod(methodName);
+            String cacheKey = target.getClass().getName() + "#" + methodName;
+            Method method = METHOD_CACHE.computeIfAbsent(cacheKey, k -> {
+                try {
+                    return target.getClass().getMethod(methodName);
+                } catch (NoSuchMethodException e) {
+                    return METHOD_NOT_FOUND_SENTINEL;
+                }
+            });
+            if (method == METHOD_NOT_FOUND_SENTINEL) {
+                return null;
+            }
             Object value = method.invoke(target);
             return value == null ? null : String.valueOf(value);
         } catch (Exception ex) {
@@ -71,7 +102,17 @@ final class DbReflectionUtil {
 
     static Boolean invokeBoolean(Object target, String methodName) {
         try {
-            Method method = target.getClass().getMethod(methodName);
+            String cacheKey = target.getClass().getName() + "#" + methodName;
+            Method method = METHOD_CACHE.computeIfAbsent(cacheKey, k -> {
+                try {
+                    return target.getClass().getMethod(methodName);
+                } catch (NoSuchMethodException e) {
+                    return METHOD_NOT_FOUND_SENTINEL;
+                }
+            });
+            if (method == METHOD_NOT_FOUND_SENTINEL) {
+                return null;
+            }
             Object value = method.invoke(target);
             if (value instanceof Boolean b) {
                 return b;

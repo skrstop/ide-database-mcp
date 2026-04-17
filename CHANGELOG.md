@@ -6,6 +6,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.1.6] - 2026-04-17
+
+### Fixed
+
+- 修复若干已知问题，提升整体稳定性。
+- 全面优化性能，降低 CPU 占用并提升 ToolWindow 响应速度。
+
+---
+
 ## [0.1.5] - 2026-04-07
 
 ### Changed

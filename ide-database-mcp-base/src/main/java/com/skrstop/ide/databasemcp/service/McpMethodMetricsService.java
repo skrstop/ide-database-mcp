@@ -26,6 +26,9 @@ public final class McpMethodMetricsService {
             "rpc:tools/call"
     );
 
+    // 用于 snapshot() 中高效过滤，避免 List.removeAll 的 O(n*m) 复杂度
+    private static final Set<String> KNOWN_METHOD_KEY_SET = new HashSet<>(KNOWN_METHOD_KEYS);
+
     private final ConcurrentHashMap<String, Stats> metrics = new ConcurrentHashMap<>();
 
     public static McpMethodMetricsService getInstance() {
@@ -41,11 +44,6 @@ public final class McpMethodMetricsService {
         return count;
     }
 
-    public int incrementUnbounded(String methodKey) {
-        Stats stats = metrics.computeIfAbsent(methodKey, ignored -> new Stats());
-        return stats.count.incrementAndGet();
-    }
-
     public Map<String, MethodMetric> snapshot() {
         Map<String, MethodMetric> result = new LinkedHashMap<>();
 
@@ -54,7 +52,7 @@ public final class McpMethodMetricsService {
         }
 
         List<String> extras = new ArrayList<>(metrics.keySet());
-        extras.removeAll(KNOWN_METHOD_KEYS);
+        extras.removeAll(KNOWN_METHOD_KEY_SET);
         extras.sort(Comparator.naturalOrder());
         for (String extra : extras) {
             result.put(extra, currentMetric(extra));

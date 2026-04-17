@@ -70,7 +70,31 @@ public final class DatabaseMcpToolWindowPanel implements Disposable {
     private final Timer refreshTimer;
     private final List<int[]> logMatchRanges = new ArrayList<>();
     private int selectedLogMatchIndex = -1;
-    private String lastRenderedLogContent = "";
+
+    // 缓存上次服务状态，避免每秒无意义的 UI 更新
+    private boolean lastRunningState = false;
+    private String lastServiceUrl = "";
+
+    // 缓存上次方法计数器快照，避免无数据变化时重建表格
+    private int lastMethodSnapshotHash = 0;
+
+    // 缓存日志区背景色，避免每秒重读 UIManager
+    private Color lastLogBackground = null;
+
+    // 缓存上次已渲染的日志内容版本号，版本未变时完全跳过拷贝与字符串拼接
+    private long lastRenderedLogVersion = -1L;
+
+    // 日志染色用的 AttributeSet 静态缓存，避免每行每次刷新重复创建
+    private static final SimpleAttributeSet ATTR_INFO = buildAttrs(LOG_INFO_FG);
+    private static final SimpleAttributeSet ATTR_WARN = buildAttrs(LOG_WARN_FG);
+    private static final SimpleAttributeSet ATTR_ERROR = buildAttrs(LOG_ERROR_FG);
+    private static final SimpleAttributeSet ATTR_DEFAULT = new SimpleAttributeSet();
+
+    private static SimpleAttributeSet buildAttrs(Color fg) {
+        SimpleAttributeSet attrs = new SimpleAttributeSet();
+        StyleConstants.setForeground(attrs, fg);
+        return attrs;
+    }
 
     public DatabaseMcpToolWindowPanel(Project project) {
         this.project = project;
@@ -165,8 +189,11 @@ public final class DatabaseMcpToolWindowPanel implements Disposable {
         refreshTimer = new Timer(1000, e -> refreshAll());
         refreshTimer.start();
 
-        logOperation("tool-window", "Tool window opened");
-        refreshAll();
+        // 首次刷新推迟到 invokeLater，让 ToolWindow 面板立即展示，避免首次打开卡顿
+        SwingUtilities.invokeLater(() -> {
+            logOperation("tool-window", "Tool window opened");
+            refreshAll();
+        });
     }
 
     public JPanel getRootPanel() {
@@ -210,6 +237,8 @@ public final class DatabaseMcpToolWindowPanel implements Disposable {
 
         clearCounterButton.addActionListener(e -> {
             McpMethodMetricsService.getInstance().clear();
+            // 清空后重置哈希缓存，强制下次刷新重建表格
+            lastMethodSnapshotHash = -1;
             logOperation("metrics", "Method counters cleared");
             refreshMethodCounters();
         });
@@ -237,6 +266,9 @@ public final class DatabaseMcpToolWindowPanel implements Disposable {
 
         clearLogButton.addActionListener(e -> {
             McpRuntimeLogService.getInstance().clear();
+            // 清空后让日志版本缓存失效并重置行计数，强制下次 refreshLogs 重新渲染
+            lastRenderedLogVersion = -1L;
+            renderedLineCount = 0;
             logOperation("tool-window", "Logs cleared");
             refreshLogs();
         });
@@ -270,12 +302,16 @@ public final class DatabaseMcpToolWindowPanel implements Disposable {
             Messages.showErrorDialog(project, result.getMessage(), DatabaseMcpMessages.message(currentLanguage, "settings.error.title"));
         }
         logOperation("tool-window", "Start service clicked: " + result.getMessage());
+        // 重置缓存，确保状态立即刷新
+        lastRunningState = !McpServerManager.getInstance().isRunning();
         refreshAll();
     }
 
     private void onStopService() {
         McpServerManager.getInstance().stop("tool-window-stop");
         logOperation("tool-window", "Stop service clicked");
+        // 重置缓存，确保状态立即刷新
+        lastRunningState = true;
         refreshAll();
     }
 
@@ -284,7 +320,6 @@ public final class DatabaseMcpToolWindowPanel implements Disposable {
         if (language != currentLanguage) {
             refreshTexts(language);
         }
-        syncLogBackground();
         refreshServiceStatus();
         refreshMethodCounters();
         refreshLogs();
@@ -293,13 +328,21 @@ public final class DatabaseMcpToolWindowPanel implements Disposable {
     private void refreshServiceStatus() {
         McpServerManager manager = McpServerManager.getInstance();
         boolean running = manager.isRunning();
+        String url = running ? manager.getServiceUrl() : "";
+
+        // 状态未变化，跳过 UI 更新，避免无意义的标签重绘
+        if (running == lastRunningState && url.equals(lastServiceUrl)) {
+            return;
+        }
+        lastRunningState = running;
+        lastServiceUrl = url;
 
         statusValueLabel.setText(running
                 ? DatabaseMcpMessages.message(currentLanguage, "toolwindow.statusRunning")
                 : DatabaseMcpMessages.message(currentLanguage, "toolwindow.statusStopped"));
         statusValueLabel.setForeground(running ? STATUS_RUNNING : STATUS_STOPPED);
 
-        addressValueLabel.setText(running ? manager.getServiceUrl() : "");
+        addressValueLabel.setText(url);
         copyAddressButton.setEnabled(running);
         startServiceButton.setEnabled(!running);
         stopServiceButton.setEnabled(running);
@@ -307,6 +350,16 @@ public final class DatabaseMcpToolWindowPanel implements Disposable {
 
     private void refreshMethodCounters() {
         Map<String, McpMethodMetricsService.MethodMetric> snapshot = McpMethodMetricsService.getInstance().snapshot();
+
+        // 计算快照哈希，只有数据变化时才重建表格，避免每秒触发大量 TableModelEvent 重绘
+        int snapshotHash = snapshot.entrySet().stream()
+                .mapToInt(e -> e.getKey().hashCode() * 31 + e.getValue().hashCode())
+                .sum();
+        if (snapshotHash == lastMethodSnapshotHash) {
+            return;
+        }
+        lastMethodSnapshotHash = snapshotHash;
+
         List<Object[]> rows = new ArrayList<>();
         for (Map.Entry<String, McpMethodMetricsService.MethodMetric> entry : snapshot.entrySet()) {
             McpMethodMetricsService.MethodMetric metric = entry.getValue();
@@ -328,29 +381,122 @@ public final class DatabaseMcpToolWindowPanel implements Disposable {
         methodTableSorter.sort();
     }
 
-    private void refreshLogs() {
-        Point viewPosition = logScrollPane.getViewport().getViewPosition();
-        List<String> lines = McpRuntimeLogService.getInstance().list();
-        String content = lines.isEmpty()
-                ? DatabaseMcpMessages.message(currentLanguage, "toolwindow.noLogs")
-                : String.join(System.lineSeparator(), lines);
+    // 当前 document 已渲染的日志行数（不含用于无日志提示的占位行）。
+    // 用于与 LogSnapshot.keptOldLines 对比，计算需要从 document 开头裁剪的老行数。
+    private int renderedLineCount = 0;
 
-        if (content.equals(lastRenderedLogContent)) {
+    private void refreshLogs() {
+        // 先用版本号短路，没有新日志时完全跳过任何工作
+        McpRuntimeLogService logService = McpRuntimeLogService.getInstance();
+        long currentVersion = logService.version();
+        if (currentVersion == lastRenderedLogVersion) {
             return;
         }
 
-        lastRenderedLogContent = content;
+        Point viewPosition = logScrollPane.getViewport().getViewPosition();
+        McpRuntimeLogService.LogSnapshot snapshot = logService.listSince(lastRenderedLogVersion);
+        lastRenderedLogVersion = snapshot.version();
 
-        if (lines.isEmpty()) {
-            setLogContent(List.of(DatabaseMcpMessages.message(currentLanguage, "toolwindow.noLogs")));
+        // 场景一：全量重建（首次打开 / clear 后首次 / 已超出环形缓冲窗口）
+        if (snapshot.fullReset()) {
+            List<String> lines = snapshot.appended();
+            if (lines.isEmpty()) {
+                setLogContent(List.of(DatabaseMcpMessages.message(currentLanguage, "toolwindow.noLogs")));
+                renderedLineCount = 0;
+            } else {
+                setLogContent(lines);
+                renderedLineCount = lines.size();
+            }
             restoreLogViewportState(viewPosition);
             updateLogSearchMatches(true);
             return;
         }
 
-        setLogContent(lines);
+        // 场景二：无新增（仅版本号对齐到最新），什么也不做
+        if (snapshot.appended().isEmpty()) {
+            return;
+        }
+
+        // 场景三：增量追加。先裁剪掉被环形缓冲淘汰的老行，再在末尾 append 新行。
+        int linesToRemove = Math.max(0, renderedLineCount - snapshot.keptOldLines());
+        if (linesToRemove > 0) {
+            removeLeadingLines(logTextArea.getStyledDocument(), linesToRemove);
+        }
+        appendLogLines(logTextArea.getStyledDocument(), snapshot.appended());
+        renderedLineCount = snapshot.keptOldLines() + snapshot.appended().size();
+
         restoreLogViewportState(viewPosition);
+        // 增量渲染后重新计算搜索高亮（document 偏移已变化）
         updateLogSearchMatches(false);
+    }
+
+    /**
+     * 从 StyledDocument 开头删掉指定行数（按 '\n' 边界计）。
+     * 当环形缓冲淘汰老行时用于同步裁剪 UI document。
+     */
+    private static void removeLeadingLines(StyledDocument document, int lineCount) {
+        if (lineCount <= 0 || document.getLength() == 0) {
+            return;
+        }
+        try {
+            String text = document.getText(0, document.getLength());
+            int idx = 0;
+            int removed = 0;
+            while (removed < lineCount) {
+                int nl = text.indexOf('\n', idx);
+                if (nl < 0) {
+                    // 剩余不足 lineCount 行，全部删除
+                    idx = document.getLength();
+                    break;
+                }
+                idx = nl + 1;
+                removed++;
+            }
+            if (idx > 0) {
+                document.remove(0, Math.min(idx, document.getLength()));
+            }
+        } catch (BadLocationException ignored) {
+            // document 状态不一致时忽略；下一轮版本号驱动会再同步
+        }
+    }
+
+    /**
+     * 在 StyledDocument 末尾追加若干日志行（含换行分隔），按级别染色。
+     */
+    private void appendLogLines(StyledDocument document, List<String> lines) {
+        if (lines.isEmpty()) {
+            return;
+        }
+        try {
+            int length = document.getLength();
+            boolean needsLeadingNewline = length > 0;
+            StringBuilder sb = new StringBuilder();
+            if (needsLeadingNewline) {
+                sb.append(System.lineSeparator());
+            }
+            // 先一次性插入纯文本，再分段染色，避免每行一次 insertString 带来的大量 DocumentEvent
+            int[] lineStartOffsets = new int[lines.size()];
+            int cursor = length + (needsLeadingNewline ? System.lineSeparator().length() : 0);
+            for (int i = 0; i < lines.size(); i++) {
+                lineStartOffsets[i] = cursor;
+                String line = lines.get(i);
+                sb.append(line);
+                cursor += line.length();
+                if (i < lines.size() - 1) {
+                    sb.append(System.lineSeparator());
+                    cursor += System.lineSeparator().length();
+                }
+            }
+            document.insertString(length, sb.toString(), null);
+            // 逐行染色
+            for (int i = 0; i < lines.size(); i++) {
+                String line = lines.get(i);
+                document.setCharacterAttributes(lineStartOffsets[i], line.length(), attributesForLine(line), true);
+            }
+        } catch (BadLocationException ignored) {
+            // 发生不一致时交给下一轮 fullReset 恢复
+            lastRenderedLogVersion = -1L;
+        }
     }
 
     private void installDividerPersistence() {
@@ -510,16 +656,25 @@ public final class DatabaseMcpToolWindowPanel implements Disposable {
         });
     }
 
+    /**
+     * 为日志行选择染色属性。
+     * 日志实际格式为 `yyyy-MM-dd HH:mm:ss.SSS [LEVEL] message`，因此使用 contains 匹配而非 startsWith。
+     * 返回复用的静态 AttributeSet，避免每行创建临时对象。
+     */
     private SimpleAttributeSet attributesForLine(String line) {
-        SimpleAttributeSet attrs = new SimpleAttributeSet();
-        if (line != null && line.startsWith("[ERROR]")) {
-            StyleConstants.setForeground(attrs, LOG_ERROR_FG);
-        } else if (line != null && line.startsWith("[WARN]")) {
-            StyleConstants.setForeground(attrs, LOG_WARN_FG);
-        } else if (line != null && line.startsWith("[INFO]")) {
-            StyleConstants.setForeground(attrs, LOG_INFO_FG);
+        if (line == null) {
+            return ATTR_DEFAULT;
         }
-        return attrs;
+        if (line.contains(" [ERROR] ")) {
+            return ATTR_ERROR;
+        }
+        if (line.contains(" [WARN] ")) {
+            return ATTR_WARN;
+        }
+        if (line.contains(" [INFO] ")) {
+            return ATTR_INFO;
+        }
+        return ATTR_DEFAULT;
     }
 
     private void copyServiceAddress() {
@@ -533,6 +688,8 @@ public final class DatabaseMcpToolWindowPanel implements Disposable {
 
     private void refreshTexts(McpSettingsState.UiLanguage language) {
         currentLanguage = language;
+        // 语言切换后，重置服务状态缓存，确保下次刷新重绘带有新语言的标签
+        lastRunningState = !McpServerManager.getInstance().isRunning();
 
         setSectionTitle(serviceSection, DatabaseMcpMessages.message(language, "toolwindow.serviceStatus"));
         setSectionTitle(methodCounterSection, DatabaseMcpMessages.message(language, "toolwindow.methodCounter"));
@@ -590,6 +747,11 @@ public final class DatabaseMcpToolWindowPanel implements Disposable {
         if (bg == null) {
             bg = logTextArea.getBackground();
         }
+        // 背景色未变化时跳过，避免重复触发 repaint
+        if (bg.equals(lastLogBackground)) {
+            return;
+        }
+        lastLogBackground = bg;
         logTextArea.setBackground(bg);
         logScrollPane.getViewport().setBackground(bg);
         logScrollPane.setBackground(bg);

@@ -156,33 +156,17 @@ public final class McpProtocolRouter {
     private String handleToolsList(JsonElement id) {
         // Delegate to centralized definitions
         List<Map<String, Object>> tools = McpToolDefinitions.getTools();
-
-        recordToolsListUsage(tools);
         return ok(id, Map.of("tools", tools));
     }
 
-    private void recordToolsListUsage(List<Map<String, Object>> tools) {
-        McpMethodMetricsService metricsService = metricsService();
-        if (metricsService == null) {
-            return;
-        }
-
-        for (Map<String, Object> tool : tools) {
-            Object name = tool.get("name");
-            if (name != null) {
-                metricsService.incrementUnbounded("tool:" + name);
-            }
-        }
-    }
 
     private void recordInvocation(String key, long elapsedNanos) {
         McpMethodMetricsService metricsService = metricsService();
         if (metricsService == null) {
             return;
         }
-
-        long count = metricsService.record(key, elapsedNanos);
-        McpRuntimeLogService.logInfo("router", "Invocation recorded: " + key + " count=" + count);
+        // 仅累加计数器，不再写运行时日志，避免每次调用产生无意义的日志写入与 UI 重绘
+        metricsService.record(key, elapsedNanos);
     }
 
     private String requiredString(JsonObject args, String field) {

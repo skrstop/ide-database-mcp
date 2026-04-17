@@ -13,13 +13,25 @@ import java.sql.Connection;
 import java.sql.Driver;
 import java.sql.DriverManager;
 import java.sql.SQLException;
-import java.util.Iterator;
-import java.util.Locale;
-import java.util.Properties;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.jar.JarFile;
 import java.util.stream.Stream;
 
 final class JdbcConnectionUtil {
+    /**
+     * 缓存已加载的驱动 ClassLoader，避免重复创建和内存泄漏。
+     * Key: driverClassName, Value: URLClassLoader。
+     * 必须使用并发集合：HTTP 工作线程池（2-10 线程）可能并发访问同一实例。
+     */
+    private final Map<String, URLClassLoader> driverClassLoaderCache = new ConcurrentHashMap<>();
+
+    /**
+     * 缓存驱动加载失败的 driverClassName，避免重复执行 Files.walk() 遍历目录树。
+     * 使用线程安全的 Set 以配合并发工作线程。
+     */
+    private final Set<String> driverLoadFailureCache = ConcurrentHashMap.newKeySet();
+
     JdbcConnectionUtil() {
     }
 
@@ -118,6 +130,12 @@ final class JdbcConnectionUtil {
     }
 
     private boolean registerDriverFromIdeaJdbcDrivers(String driverClass) {
+        // 如果之前已经加载失败过，直接返回，避免重复遍历目录树
+        if (driverLoadFailureCache.contains(driverClass)) {
+            McpRuntimeLogService.logInfo("jdbc", "Skipping JDBC driver registration (previously failed): " + driverClass);
+            return false;
+        }
+
         Path driverRoot = Path.of(PathManager.getConfigPath(), "jdbc-drivers");
         if (!Files.isDirectory(driverRoot)) {
             return false;
@@ -134,7 +152,16 @@ final class JdbcConnectionUtil {
                     continue;
                 }
 
-                URLClassLoader loader = new URLClassLoader(new URL[]{jar.toUri().toURL()}, getClass().getClassLoader());
+                URLClassLoader loader = driverClassLoaderCache.computeIfAbsent(driverClass, k -> {
+                    try {
+                        return new URLClassLoader(new URL[]{jar.toUri().toURL()}, getClass().getClassLoader());
+                    } catch (Exception ex) {
+                        return null;
+                    }
+                });
+                if (loader == null) {
+                    continue;
+                }
                 Class<?> loaded = Class.forName(driverClass, true, loader);
                 Object instance = loaded.getDeclaredConstructor().newInstance();
                 if (instance instanceof Driver driver) {
@@ -146,6 +173,8 @@ final class JdbcConnectionUtil {
         } catch (Exception e) {
             McpRuntimeLogService.logWarn("jdbc", "Failed to register JDBC driver from IDE jdbc-drivers: " + driverClass + ", " + e.getMessage());
         }
+        // 将加载失败的 driverClass 缓存起来，避免重复执行 Files.walk() 遍历目录树
+        driverLoadFailureCache.add(driverClass);
         return false;
     }
 
@@ -158,4 +187,3 @@ final class JdbcConnectionUtil {
     }
 
 }
-
