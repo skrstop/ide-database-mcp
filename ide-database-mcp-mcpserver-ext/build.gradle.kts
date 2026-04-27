@@ -37,6 +37,12 @@ tasks.withType<JavaCompile>().configureEach {
     options.compilerArgs.add("-parameters")
 }
 
+// Gradle 9.x 严格模式下，Kotlin 编译产物与 IntelliJ Platform 插件追加的 META-INF 资源
+// 可能重复（例如 ide-database-mcp-mcpserver-ext.kotlin_module），统一以 EXCLUDE 策略避免构建失败
+tasks.withType<Jar>().configureEach {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
     kotlinOptions {
         // 强制编译器忽略元数据版本不一致的问题

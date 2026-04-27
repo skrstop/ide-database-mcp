@@ -3,6 +3,7 @@ package com.skrstop.ide.databasemcp.toolwindow;
 import com.intellij.icons.AllIcons;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.ide.CopyPasteManager;
+import com.intellij.openapi.options.ShowSettingsUtil;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.Messages;
 import com.intellij.ui.JBColor;
@@ -12,6 +13,7 @@ import com.intellij.ui.table.JBTable;
 import com.skrstop.ide.databasemcp.service.McpMethodMetricsService;
 import com.skrstop.ide.databasemcp.service.McpRuntimeLogService;
 import com.skrstop.ide.databasemcp.service.McpServerManager;
+import com.skrstop.ide.databasemcp.settings.CustomToolsConfigurable;
 import com.skrstop.ide.databasemcp.settings.DatabaseMcpMessages;
 import com.skrstop.ide.databasemcp.settings.McpSettingsState;
 
@@ -54,6 +56,7 @@ public final class DatabaseMcpToolWindowPanel implements Disposable {
     private final JButton copyAddressButton;
     private final JButton startServiceButton;
     private final JButton stopServiceButton;
+    private final JButton addCustomToolButton;
 
     private final JButton clearCounterButton;
     private final JBTable methodTable;
@@ -111,6 +114,9 @@ public final class DatabaseMcpToolWindowPanel implements Disposable {
         copyAddressButton = new JButton();
         startServiceButton = new JButton();
         stopServiceButton = new JButton();
+        addCustomToolButton = new JButton();
+        // 仅在服务运行时显示
+        addCustomToolButton.setVisible(false);
 
         clearCounterButton = new JButton();
         methodTableModel = new DefaultTableModel(new Object[][]{}, new Object[]{"Method", "Calls", "Avg(ms)", "Total(ms)"}) {
@@ -192,6 +198,8 @@ public final class DatabaseMcpToolWindowPanel implements Disposable {
         // 首次刷新推迟到 invokeLater，让 ToolWindow 面板立即展示，避免首次打开卡顿
         SwingUtilities.invokeLater(() -> {
             logOperation("tool-window", "Tool window opened");
+            // 面板初次打开时同步自定义 tool 到统计表，确保已配置的自定义 SQL 立即出现在方法计数列表中
+            McpMethodMetricsService.getInstance().syncCustomTools();
             refreshAll();
         });
     }
@@ -209,6 +217,7 @@ public final class DatabaseMcpToolWindowPanel implements Disposable {
         statusRow.add(statusValueLabel);
         statusRow.add(startServiceButton);
         statusRow.add(stopServiceButton);
+        statusRow.add(addCustomToolButton);
 
         JPanel addressRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
         addressRow.add(serviceAddressLabel);
@@ -223,6 +232,7 @@ public final class DatabaseMcpToolWindowPanel implements Disposable {
         startServiceButton.addActionListener(e -> onStartService());
         stopServiceButton.addActionListener(e -> onStopService());
         copyAddressButton.addActionListener(e -> copyServiceAddress());
+        addCustomToolButton.addActionListener(e -> openCustomToolsSettings());
 
         section.add(rows, BorderLayout.CENTER);
         return section;
@@ -346,6 +356,19 @@ public final class DatabaseMcpToolWindowPanel implements Disposable {
         copyAddressButton.setEnabled(running);
         startServiceButton.setEnabled(!running);
         stopServiceButton.setEnabled(running);
+        // 仅在服务运行时显示「添加自定义工具」按钮
+        addCustomToolButton.setVisible(running);
+    }
+
+    /**
+     * 打开「自定义工具」设置页。
+     * <p>使用 {@link ShowSettingsUtil#editConfigurable} 直接传入实例，
+     * 避免 {@code showSettingsDialog(project, Class)} 在 Settings 树尚未完全初始化时
+     * 找不到 applicationConfigurable 而显示 "Nothing to show" 的问题。</p>
+     */
+    private void openCustomToolsSettings() {
+        ShowSettingsUtil.getInstance().editConfigurable(project, new CustomToolsConfigurable());
+        logOperation("tool-window", "Open custom tools settings clicked");
     }
 
     private void refreshMethodCounters() {
@@ -700,6 +723,7 @@ public final class DatabaseMcpToolWindowPanel implements Disposable {
         copyAddressButton.setText(DatabaseMcpMessages.message(language, "toolwindow.copyAddress"));
         startServiceButton.setText(DatabaseMcpMessages.message(language, "toolwindow.startService"));
         stopServiceButton.setText(DatabaseMcpMessages.message(language, "toolwindow.stopService"));
+        addCustomToolButton.setText(DatabaseMcpMessages.message(language, "toolwindow.addCustomTool"));
 
         clearCounterButton.setText(DatabaseMcpMessages.message(language, "toolwindow.resetCounter"));
         methodTableModel.setColumnIdentifiers(new Object[]{

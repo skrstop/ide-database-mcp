@@ -5,12 +5,16 @@ import com.intellij.openapi.application.ApplicationManager;
 import com.skrstop.ide.databasemcp.db.IdeDatabaseFacade;
 import com.skrstop.ide.databasemcp.service.McpMethodMetricsService;
 import com.skrstop.ide.databasemcp.service.McpRuntimeLogService;
+import com.skrstop.ide.databasemcp.settings.CustomToolDefinition;
+import com.skrstop.ide.databasemcp.settings.CustomToolParameter;
 import com.skrstop.ide.databasemcp.settings.McpSettingsState;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public final class McpProtocolRouter {
     private static final Gson GSON = new Gson();
@@ -143,7 +147,7 @@ public final class McpProtocolRouter {
                             + " on data source: " + dataSource + ", sampled=" + sampleResult.get("sampledCount"));
                     yield ok(id, mcpToolResult(sampleResult));
                 }
-                default -> error(id, -32602, "Unsupported tool: " + toolName);
+                default -> handleCustomTool(id, toolName, args);
             };
         } catch (Exception ex) {
             McpRuntimeLogService.logError("router", "Tool call failed: " + toolName + ", error=" + ex.getMessage());
@@ -154,9 +158,146 @@ public final class McpProtocolRouter {
     }
 
     private String handleToolsList(JsonElement id) {
-        // Delegate to centralized definitions
-        List<Map<String, Object>> tools = McpToolDefinitions.getTools();
+        // Delegate to centralized definitions (合并内置 + 自定义 tool)
+        List<Map<String, Object>> tools = McpToolDefinitions.getAllTools();
         return ok(id, Map.of("tools", tools));
+    }
+
+    /**
+     * 自定义 SQL 中 {@code ${name}} 占位符的统一正则。变量名与 JSON 字段名一致：
+     * 必须以字母或下划线开头，后续允许字母数字下划线。
+     */
+    private static final Pattern CUSTOM_SQL_VAR_PATTERN = Pattern.compile("\\$\\{([A-Za-z_][A-Za-z0-9_]*)}");
+
+    /**
+     * 处理自定义 tool 调用。
+     * <p>按 tool 名查找用户在 Settings 中配置的 {@link CustomToolDefinition}，将 SQL 中的
+     * {@code ${name}} 占位符替换为 {@code ?}，按声明顺序绑定 {@link CustomToolParameter} 对应的入参，
+     * 根据 {@link CustomToolDefinition#sqlMode} 选择查询或 DML 执行路径。</p>
+     *
+     * @param id       JSON-RPC 请求 id
+     * @param toolName 客户端请��的 tool 名
+     * @param args     客户端入参
+     * @return JSON-RPC 响应文本
+     */
+    private String handleCustomTool(JsonElement id, String toolName, JsonObject args) {
+        CustomToolDefinition def = findCustomTool(toolName);
+        if (def == null) {
+            return error(id, -32602, "Unsupported tool: " + toolName);
+        }
+
+        if (def.dataSourceName == null || def.dataSourceName.isBlank()) {
+            return error(id, -32000, "Custom tool '" + toolName + "' has no bound data source. Please reconfigure it in Settings.");
+        }
+        if (def.sql == null || def.sql.isBlank()) {
+            return error(id, -32000, "Custom tool '" + toolName + "' has no SQL configured. Please reconfigure it in Settings.");
+        }
+
+        String project = args.has("project") ? args.get("project").getAsString() : "";
+        McpSettingsState.DataSourceScope scope = parseScopeArg(args);
+
+        List<String> varsInOrder = extractSqlVarsInOrder(def.sql);
+        List<Object> bindValues = new ArrayList<>(varsInOrder.size());
+        Map<String, CustomToolParameter> paramByName = indexParameters(def);
+
+        for (String varName : varsInOrder) {
+            CustomToolParameter declared = paramByName.get(varName);
+            try {
+                Object value = resolveBindValue(varName, declared, args);
+                bindValues.add(value);
+            } catch (IllegalArgumentException ex) {
+                return error(id, -32602, ex.getMessage());
+            }
+        }
+
+        String preparedSql = CUSTOM_SQL_VAR_PATTERN.matcher(def.sql).replaceAll("?");
+        boolean isDml = CustomToolDefinition.SQL_MODE_DML.equalsIgnoreCase(def.sqlMode);
+        Map<String, Object> result;
+        if (isDml) {
+            result = databaseFacade.executeDmlSqlPrepared(project, def.dataSourceName, preparedSql, bindValues, scope);
+        } else {
+            int defaultMaxRows = def.maxRows > 0 ? def.maxRows : 100;
+            int maxRows = args.has("maxRows") ? args.get("maxRows").getAsInt() : defaultMaxRows;
+            result = databaseFacade.executeQuerySqlPrepared(project, def.dataSourceName, preparedSql, bindValues, maxRows, scope);
+        }
+        McpRuntimeLogService.logInfo("router", "Executed custom tool '" + toolName
+                + "' on data source: " + def.dataSourceName + ", mode=" + def.sqlMode + ", params=" + varsInOrder.size());
+        return ok(id, mcpToolResult(result));
+    }
+
+    private List<String> extractSqlVarsInOrder(String sql) {
+        List<String> result = new ArrayList<>();
+        Matcher m = CUSTOM_SQL_VAR_PATTERN.matcher(sql);
+        while (m.find()) {
+            result.add(m.group(1));
+        }
+        return result;
+    }
+
+    private Map<String, CustomToolParameter> indexParameters(CustomToolDefinition def) {
+        Map<String, CustomToolParameter> map = new HashMap<>();
+        if (def.parameters != null) {
+            for (CustomToolParameter p : def.parameters) {
+                if (p != null && p.name != null && !p.name.isBlank()) {
+                    map.put(p.name, p);
+                }
+            }
+        }
+        return map;
+    }
+
+    /**
+     * 根据声明的参数类型将客户端原始入参转换为 JDBC 绑定值。
+     * <p>缺失且 required 时抛出非法参数异常；缺失但有 default 时使用 default。</p>
+     */
+    private Object resolveBindValue(String varName, CustomToolParameter declared, JsonObject args) {
+        boolean present = args.has(varName) && !args.get(varName).isJsonNull();
+        String type = declared == null ? CustomToolParameter.TYPE_STRING : declared.type;
+        if (!present) {
+            if (declared != null && declared.defaultValue != null && !declared.defaultValue.isBlank()) {
+                return convertByType(varName, type, declared.defaultValue);
+            }
+            if (declared == null || declared.required) {
+                throw new IllegalArgumentException("Missing required argument: " + varName);
+            }
+            return null;
+        }
+        JsonElement el = args.get(varName);
+        return convertByType(varName, type, el.isJsonPrimitive() ? el.getAsString() : el.toString());
+    }
+
+    private Object convertByType(String varName, String type, String raw) {
+        try {
+            switch (type == null ? CustomToolParameter.TYPE_STRING : type) {
+                case CustomToolParameter.TYPE_INTEGER:
+                    return Long.parseLong(raw.trim());
+                case CustomToolParameter.TYPE_NUMBER:
+                    return Double.parseDouble(raw.trim());
+                case CustomToolParameter.TYPE_BOOLEAN:
+                    return Boolean.parseBoolean(raw.trim());
+                case CustomToolParameter.TYPE_STRING:
+                default:
+                    return raw;
+            }
+        } catch (NumberFormatException ex) {
+            throw new IllegalArgumentException("Invalid value for argument '" + varName + "' (expected " + type + "): " + raw);
+        }
+    }
+
+    /**
+     * 在当前生效作用域下按名查找自定义 tool。禁用的 tool 视为不存在，避免客户端缓存的
+     * tool 名在禁用后仍能被调用。
+     */
+    private CustomToolDefinition findCustomTool(String toolName) {
+        if (toolName == null || toolName.isBlank()) {
+            return null;
+        }
+        for (CustomToolDefinition def : McpSettingsState.getInstance().getCustomToolsEffective()) {
+            if (def != null && def.enabled && toolName.equals(def.name)) {
+                return def;
+            }
+        }
+        return null;
     }
 
 

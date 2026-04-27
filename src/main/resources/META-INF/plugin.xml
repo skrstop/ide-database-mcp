@@ -78,6 +78,16 @@
     ]]></description>
 
     <change-notes><![CDATA[
+        <b>0.1.7</b>
+        <ul>
+            <li>Custom Tools: Added <b>Copy / Duplicate</b> button in the toolbar (after the remove button) to create a deep copy of the selected custom tool, with auto-generated unique name.</li>
+            <li>Custom Tools: Preview row count now respects the user-configured <b>Max Rows</b> field (defaults to 100 when unset); preview panel height increased for better readability.</li>
+            <li>Custom Tools: After saving (Apply / OK), the <b>method call statistics table</b> in the tool window now immediately reflects additions, deletions, enables, and disables — removed/disabled tools disappear and newly added/enabled tools appear with a zero-count entry.</li>
+            <li>自定义工具新增复制按钮，支持一键深拷贝选中工具（含所有参数）并自动生成唯一方法名。</li>
+            <li>自定义工具测试预览行数改为使用「最大行数」字段配置值；预览面板高度增大。</li>
+            <li>保存自定义工具配置后，工具窗口方法调用统计表立即同步：已删除/禁用条目移除，已新增/启用条目预置 0 计数。</li>
+        </ul>
+
         <b>0.1.6</b>
         <ul>
             <li>修复若干已知问题，提升整体稳定性。</li>
@@ -143,6 +153,11 @@
                 displayName="Database MCP"
                 parentId="tools"
                 instance="com.skrstop.ide.databasemcp.settings.McpSettingsConfigurable"/>
+        <applicationConfigurable
+                id="com.skrstop.ide.databasemcpsettings.customTools"
+                displayName="Custom SQL"
+                parentId="com.skrstop.ide.databasemcpsettings"
+                instance="com.skrstop.ide.databasemcp.settings.CustomToolsConfigurable"/>
         <toolWindow
                 id="Database MCP"
                 anchor="right"

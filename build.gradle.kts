@@ -4,7 +4,7 @@ plugins {
 }
 
 group = "com.skrstop.ide"
-val baseVersion = "0.1.6"
+val baseVersion = "0.1.7"
 
 
 // 1. 读取命令行参数，默认为 "modern" (包含 新版本特性)
@@ -103,5 +103,20 @@ tasks {
 
     named<org.jetbrains.intellij.platform.gradle.tasks.BuildPluginTask>("buildPlugin") {
         archiveBaseName.set(if (isModern) "ide-database-mcp" else "ide-database-mcp")
+    }
+
+    // IntelliJ Platform Gradle Plugin 2.5.0 在沙盒启动时会注入一个空的 coroutines-javaagent.jar
+    // (仅含 MANIFEST 指向 kotlinx.coroutines.debug.AgentPremain，但 jar 内无类文件)，
+    // 配合 IU-2025.2 启动时会因 ClassNotFoundException 触发 FATAL ERROR，导致 runIde 直接终止。
+    // 这里在最终启动前把该 javaagent 参数从 jvmArgs 中过滤掉。
+    withType<JavaExec>().matching { it.name.startsWith("runIde") }.configureEach {
+        doFirst {
+            val current = jvmArgs ?: emptyList()
+            val filtered = current.filterNot { it.contains("coroutines-javaagent") }
+            if (filtered.size != current.size) {
+                jvmArgs = filtered
+                logger.lifecycle("[runIde] Removed coroutines-javaagent JVM argument to avoid IU-2025.2 startup failure.")
+            }
+        }
     }
 }

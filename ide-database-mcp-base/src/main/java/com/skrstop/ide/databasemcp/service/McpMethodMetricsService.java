@@ -3,6 +3,8 @@ package com.skrstop.ide.databasemcp.service;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.components.Service;
 import com.skrstop.ide.databasemcp.mcp.McpToolDefinitions;
+import com.skrstop.ide.databasemcp.settings.CustomToolDefinition;
+import com.skrstop.ide.databasemcp.settings.McpSettingsState;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -63,6 +65,40 @@ public final class McpMethodMetricsService {
 
     public void clear() {
         metrics.clear();
+    }
+
+    /**
+     * 自定义 tool 在统计表中使用的 key 前缀，用于在 {@link #syncCustomTools()} 中过滤需要清理的条目。
+     */
+    private static final String CUSTOM_TOOL_KEY_PREFIX = "tool:custom_";
+
+    /**
+     * 将统计表与「当前生效的自定义 tool」对齐：
+     * <ul>
+     *   <li>已删除 / 已禁用 的自定义 tool 条目从 metrics 中移除，使其立刻从统计表消失；</li>
+     *   <li>新增 / 启用 的自定义 tool 预置 0 计数 {@link Stats}，使其立刻显示在统计表（即便尚未被调用）。</li>
+     * </ul>
+     * <p>调用方：{@code CustomToolsConfigurable#apply()} 在持久化新配置后触发。</p>
+     */
+    public void syncCustomTools() {
+        Set<String> activeKeys = new HashSet<>();
+        for (CustomToolDefinition def : McpSettingsState.getInstance().getCustomToolsEffective()) {
+            if (def != null && def.enabled && def.name != null && !def.name.isBlank()) {
+                activeKeys.add("tool:" + def.name.trim());
+            }
+        }
+        // 1. 移除已不再生效的自定义 tool 计数条目
+        Iterator<Map.Entry<String, Stats>> it = metrics.entrySet().iterator();
+        while (it.hasNext()) {
+            String key = it.next().getKey();
+            if (key.startsWith(CUSTOM_TOOL_KEY_PREFIX) && !activeKeys.contains(key)) {
+                it.remove();
+            }
+        }
+        // 2. 为生效的自定义 tool 预置 0 计数条目，使其立刻出现在统计表中
+        for (String key : activeKeys) {
+            metrics.computeIfAbsent(key, ignored -> new Stats());
+        }
     }
 
     private MethodMetric currentMetric(String key) {

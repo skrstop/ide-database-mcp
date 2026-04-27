@@ -11,6 +11,9 @@ import com.intellij.openapi.project.ProjectManager;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Locale;
 
 @Service(Service.Level.APP)
@@ -186,6 +189,34 @@ public final class McpSettingsState implements PersistentStateComponent<McpSetti
         markConfigured(scope, target);
     }
 
+    /**
+     * 自定义工具配置页 Splitter 比例（0~1）。
+     *
+     * <p>Splitter 比例属于全局 UI 偏好，始终读写全局 {@code state}，
+     * 与插件作用域（PROJECT / GLOBAL）无关，避免读写路径不一致导致比例无法持久化。</p>
+     */
+    public float getCustomToolsSplitterProportion() {
+        float v = state.customToolsSplitterProportion;
+        if (v < 0.05f || v > 0.95f) {
+            return 0.28f;
+        }
+        return v;
+    }
+
+    /**
+     * 保存自定义工具配置页 Splitter 比例（0~1）。
+     *
+     * <p>始终写入全局 {@code state}，与 {@link #getCustomToolsSplitterProportion()} 保持一致的读写路径。</p>
+     *
+     * @param proportion 分割条比例，超出 [0.05, 0.95] 范围时忽略
+     */
+    public void setCustomToolsSplitterProportion(float proportion) {
+        if (proportion < 0.05f || proportion > 0.95f) {
+            return;
+        }
+        state.customToolsSplitterProportion = proportion;
+    }
+
     public int getMaxEntries() {
         return getMaxEntries(getPluginSettingsScope());
     }
@@ -297,11 +328,14 @@ public final class McpSettingsState implements PersistentStateComponent<McpSetti
             return true;
         }
 
+        // 注意：各字段比较值必须与 State 中对应字段的 Java 默认值保持一致，
+        // 否则会导致"默认项目状态被误判为已配置"，从而使 resolveEffectiveState()
+        // 始终返回 project state，与 resolveState(GLOBAL) 写路径产生不一致。
         return !projectState.autoStart
                 || projectState.port != DEFAULT_PORT
                 || !DataSourceScope.ALL.name().equals(projectState.dataSourceScope)
                 || !defaultUiLanguage().name().equals(projectState.uiLanguage)
-                || projectState.maxEntries != 2000
+                || projectState.maxEntries != 500           // 与 State.maxEntries = 500 保持一致
                 || projectState.maxFileSize != 10 * 1024 * 1024
                 || projectState.maxLogFiles != 5
                 || projectState.readBufferSize != 512 * 1024;
@@ -367,10 +401,95 @@ public final class McpSettingsState implements PersistentStateComponent<McpSetti
         public boolean settingsConfigured = false;
         public int toolWindowTopDividerLocation = 100;
         public int toolWindowBottomDividerLocation = 220;
+        /**
+         * 自定义工具配置页左右分割条的比例（0~1）。默认 0.28。
+         */
+        public float customToolsSplitterProportion = 0.28f;
         public int maxEntries = 500;
         public long maxFileSize = 10 * 1024 * 1024;
         public int maxLogFiles = 5;
         public int readBufferSize = 512 * 1024;
+        /**
+         * 用户在 Settings 中配置的自定义 MCP tool 列表。
+         *
+         * @see CustomToolDefinition
+         */
+        public List<CustomToolDefinition> customTools = new ArrayList<>();
+    }
+
+    /**
+     * 读取当前生效的自定义 tool 列表：合并 PROJECT 与 GLOBAL，按 {@code name} 去重，PROJECT 优先。
+     *
+     * <p>注意此处不再依赖 {@code resolveEffectiveState()}，因为后者会在 project state 任意字段
+     * 偏离默认时整体接管，从而导致 GLOBAL 中已配置的 customTools 被忽略。
+     * 自定义 tool 应当独立合并，确保用户在任一作用域下配置的 tool 都能被 MCP 客户端发现。</p>
+     *
+     * @return 不可变的自定义 tool 列表，永不返回 {@code null}
+     */
+    public List<CustomToolDefinition> getCustomToolsEffective() {
+        List<CustomToolDefinition> merged = new ArrayList<>();
+        java.util.Set<String> seen = new java.util.HashSet<>();
+
+        Project project = currentProject();
+        if (project != null) {
+            List<CustomToolDefinition> projectTools = McpProjectSettingsState.getInstance(project).getCurrentState().customTools;
+            if (projectTools != null) {
+                for (CustomToolDefinition def : projectTools) {
+                    if (def != null && def.name != null && !def.name.isBlank() && seen.add(def.name)) {
+                        merged.add(def);
+                    }
+                }
+            }
+        }
+        if (state.customTools != null) {
+            for (CustomToolDefinition def : state.customTools) {
+                if (def != null && def.name != null && !def.name.isBlank() && seen.add(def.name)) {
+                    merged.add(def);
+                }
+            }
+        }
+        if (merged.isEmpty()) {
+            return Collections.emptyList();
+        }
+        return Collections.unmodifiableList(merged);
+    }
+
+    /**
+     * 读取指定作用域下的自定义 tool 列表（编辑用，返回独立副本）。
+     *
+     * @param scope 目标作用域
+     * @return 自定义 tool 副本列表
+     */
+    public List<CustomToolDefinition> getCustomTools(PluginSettingsScope scope) {
+        List<CustomToolDefinition> source = resolveState(scope).customTools;
+        if (source == null || source.isEmpty()) {
+            return new ArrayList<>();
+        }
+        List<CustomToolDefinition> copies = new ArrayList<>(source.size());
+        for (CustomToolDefinition def : source) {
+            copies.add(def.copy());
+        }
+        return copies;
+    }
+
+    /**
+     * 写入指定作用域下的自定义 tool 列表，会做副本隔离防止外部后续修改影响持久化状态。
+     *
+     * @param scope 目标作用域
+     * @param tools 待写入的 tool 列表
+     */
+    public void setCustomTools(PluginSettingsScope scope, List<CustomToolDefinition> tools) {
+        State target = resolveState(scope);
+        List<CustomToolDefinition> copies = new ArrayList<>();
+        if (tools != null) {
+            for (CustomToolDefinition def : tools) {
+                if (def != null) {
+                    copies.add(def.copy());
+                }
+            }
+        }
+        target.customTools = copies;
+        markConfigured(scope, target);
     }
 
     private static String defaultUiLanguageStatic() {

@@ -48,24 +48,38 @@ final class DataSourceDiscoveryUtil {
         if (project == null) {
             return new ArrayList<>();
         }
-        DiscoveryResult result = tryReadDataSourceStorage(project);
-        if (result != null) {
-            result.apiReached = true;
-            return asScopedDataSources(result, McpSettingsState.DataSourceScope.PROJECT);
+        DiscoveryResult storageResult = tryReadDataSourceStorage(project);
+        if (storageResult != null) {
+            storageResult.apiReached = true;
+            List<ScopedDataSource> scoped = asScopedDataSources(storageResult, McpSettingsState.DataSourceScope.PROJECT);
+            if (!scoped.isEmpty()) {
+                // DataSourceStorage 正确返回了项目级数据源，直接使用
+                return scoped;
+            }
+            // DataSourceStorage 返回的全是 global 数据源（旧版 IDE 中 DataSourceStorage 为 App 级服务，
+            // 不区分 project 级存储），降级到反射路径通过 LocalDataSourceManager 重新发现项目级数据源
+            McpRuntimeLogService.logInfo("discovery",
+                    "DataSourceStorage returned no project-scoped sources, fallback to reflection discovery");
         }
 
-        result = discoverDataSources(PROJECT_MANAGER_CLASS_CANDIDATES, project, McpSettingsState.DataSourceScope.PROJECT);
+        DiscoveryResult result = discoverDataSources(PROJECT_MANAGER_CLASS_CANDIDATES, project, McpSettingsState.DataSourceScope.PROJECT);
         return asScopedDataSources(result, McpSettingsState.DataSourceScope.PROJECT);
     }
 
     private List<ScopedDataSource> loadGlobalScopedDataSources(Project project) {
-        DiscoveryResult result = tryReadDataSourceStorage(null);
-        if (result != null) {
-            result.apiReached = true;
-            return asScopedDataSources(result, McpSettingsState.DataSourceScope.GLOBAL);
+        DiscoveryResult storageResult = tryReadDataSourceStorage(null);
+        if (storageResult != null) {
+            storageResult.apiReached = true;
+            List<ScopedDataSource> scoped = asScopedDataSources(storageResult, McpSettingsState.DataSourceScope.GLOBAL);
+            if (!scoped.isEmpty()) {
+                return scoped;
+            }
+            // DataSourceStorage 过滤后无全局数据源，降级到反射路径
+            McpRuntimeLogService.logInfo("discovery",
+                    "DataSourceStorage returned no global-scoped sources, fallback to reflection discovery");
         }
 
-        result = discoverDataSources(GLOBAL_MANAGER_CLASS_CANDIDATES, project, McpSettingsState.DataSourceScope.GLOBAL);
+        DiscoveryResult result = discoverDataSources(GLOBAL_MANAGER_CLASS_CANDIDATES, project, McpSettingsState.DataSourceScope.GLOBAL);
         return asScopedDataSources(result, McpSettingsState.DataSourceScope.GLOBAL);
     }
 

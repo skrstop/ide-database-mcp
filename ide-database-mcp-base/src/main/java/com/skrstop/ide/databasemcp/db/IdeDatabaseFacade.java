@@ -82,6 +82,92 @@ public class IdeDatabaseFacade {
         return executeSqlInternal(projectHint, dataSourceName, sql, maxRows, overrideScope, SqlMode.QUERY);
     }
 
+    /**
+     * 使用 {@link PreparedStatement} 执行带参数绑定的查询 SQL。
+     *
+     * <p>专为自定义 MCP Tool 提供，SQL 中 {@code ${name}} 占位符必须由调用方在传入前替换为 {@code ?}，
+     * 并按出现顺序提供 {@code bindValues}。</p>
+     *
+     * @param projectHint    项目路径提示，可为空
+     * @param dataSourceName 数据源名称
+     * @param sql            已经把 {@code ${...}} 替换为 {@code ?} 的预编译 SQL
+     * @param bindValues     按 {@code ?} 顺序的绑定值，可为 {@code null}
+     * @param maxRows        最大返回行数
+     * @param overrideScope  数据源 scope 覆盖
+     * @return 与 {@link #executeQuerySql} 相同结构的结果 Map
+     */
+    public Map<String, Object> executeQuerySqlPrepared(String projectHint, String dataSourceName, String sql,
+                                                       List<Object> bindValues, int maxRows,
+                                                       McpSettingsState.DataSourceScope overrideScope) {
+        return executePreparedInternal(projectHint, dataSourceName, sql, bindValues, maxRows, overrideScope, SqlMode.QUERY);
+    }
+
+    /**
+     * 使用 {@link PreparedStatement} 执行带参数绑定的 DML SQL（INSERT / UPDATE / DELETE）。
+     *
+     * <p>专为自定义 MCP Tool DML 模式提供，不返回结果集，仅返回影响行数（affectedRows）。</p>
+     *
+     * @param projectHint    项目路径提示，可为空
+     * @param dataSourceName 数据源名称
+     * @param sql            已经把 {@code ${...}} 替换为 {@code ?} 的预编译 DML SQL
+     * @param bindValues     按 {@code ?} 顺序的绑定值，可为 {@code null}
+     * @param overrideScope  数据源 scope 覆盖
+     * @return 包含 {@code affectedRows} 的结果 Map
+     */
+    public Map<String, Object> executeDmlSqlPrepared(String projectHint, String dataSourceName, String sql,
+                                                     List<Object> bindValues,
+                                                     McpSettingsState.DataSourceScope overrideScope) {
+        return executePreparedInternal(projectHint, dataSourceName, sql, bindValues, 0, overrideScope, SqlMode.DML);
+    }
+
+    /**
+     * PreparedStatement 执行的统一内部方法，支持 QUERY 和 DML 两种模式。
+     */
+    private Map<String, Object> executePreparedInternal(String projectHint, String dataSourceName, String sql,
+                                                        List<Object> bindValues, int maxRows,
+                                                        McpSettingsState.DataSourceScope overrideScope,
+                                                        SqlMode mode) {
+        if (sql == null || sql.isBlank()) {
+            throw new IllegalArgumentException("SQL must not be empty");
+        }
+        Object dataSource = resolveRequiredDataSource(projectHint, dataSourceName, overrideScope);
+
+        Map<String, Object> payload = new HashMap<>();
+        List<Map<String, Object>> rows = new ArrayList<>();
+        try (Connection conn = connectionUtil.openConnection(dataSource, dataSourceName);
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            if (mode == SqlMode.QUERY && maxRows > 0) {
+                ps.setMaxRows(Math.max(DEFAULT_ROW_SIZE, maxRows));
+            }
+            if (bindValues != null) {
+                for (int i = 0; i < bindValues.size(); i++) {
+                    ps.setObject(i + 1, bindValues.get(i));
+                }
+            }
+            if (mode == SqlMode.DML) {
+                int affectedRows = ps.executeUpdate();
+                payload.put("hasResultSet", false);
+                payload.put("affectedRows", affectedRows);
+                payload.put("updateCount", affectedRows);
+            } else {
+                boolean hasResultSet = ps.execute();
+                if (hasResultSet) {
+                    rows = readResultSetRows(ps.getResultSet());
+                }
+                payload.put("hasResultSet", hasResultSet);
+                payload.put("updateCount", hasResultSet ? -1 : ps.getUpdateCount());
+            }
+            payload.put("mode", mode.name());
+        } catch (Exception ex) {
+            throw new IllegalStateException("SQL execution failed: " + ex.getMessage(), ex);
+        }
+
+        payload.put("dataSource", dataSourceName);
+        payload.put("rowCount", rows.size());
+        payload.put("rows", rows);
+        return payload;
+    }
+
     public Map<String, Object> executeDmlSql(String projectHint, String dataSourceName, String sql,
                                              McpSettingsState.DataSourceScope overrideScope) {
         return executeSqlInternal(projectHint, dataSourceName, sql, 1, overrideScope, SqlMode.DML);
