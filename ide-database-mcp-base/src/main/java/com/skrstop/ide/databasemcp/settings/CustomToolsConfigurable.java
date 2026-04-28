@@ -1,6 +1,8 @@
 package com.skrstop.ide.databasemcp.settings;
 
 import com.intellij.icons.AllIcons;
+import com.intellij.openapi.actionSystem.ActionUpdateThread;
+import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.options.Configurable;
@@ -13,7 +15,6 @@ import com.intellij.openapi.project.ProjectManager;
 import com.intellij.openapi.ui.ComboBox;
 import com.intellij.openapi.ui.DialogWrapper;
 import com.intellij.openapi.ui.Messages;
-import com.intellij.ui.AnActionButton;
 import com.intellij.ui.OnePixelSplitter;
 import com.intellij.ui.ToolbarDecorator;
 import com.intellij.ui.components.JBLabel;
@@ -47,6 +48,7 @@ import java.util.*;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /**
  * 自定义 MCP Tool 配置页：左侧列表 + 右侧详情，支持新增 / 删除 / 重命名 / 修改 SQL、参数与默认行数。
@@ -96,7 +98,7 @@ public final class CustomToolsConfigurable implements Configurable {
     private JBTextField nameField;
     private JTextArea descriptionArea;
     private JLabel descriptionCounterLabel;
-    private ComboBox<String> dataSourceCombo;
+    private ComboBox<Object> dataSourceCombo;
     private JButton refreshDataSourceButton;
     /**
      * SQL 类型下拉：Query（SELECT）或 DML（INSERT/UPDATE/DELETE）。
@@ -188,17 +190,22 @@ public final class CustomToolsConfigurable implements Configurable {
         JPanel listPanel = ToolbarDecorator.createDecorator(toolList)
                 .setAddAction(b -> addNewTool())
                 .setRemoveAction(b -> removeSelectedTool())
-                .addExtraAction(new AnActionButton(
+                .addExtraAction(new AnAction(
                         DatabaseMcpMessages.message("settings.customTools.action.copy"),
                         DatabaseMcpMessages.message("settings.customTools.action.copy.description"),
                         AllIcons.Actions.Copy) {
+                    @Override
+                    public @NotNull ActionUpdateThread getActionUpdateThread() {
+                        return ActionUpdateThread.EDT;
+                    }
+
                     @Override
                     public void actionPerformed(@NotNull AnActionEvent e) {
                         copySelectedTool();
                     }
 
                     @Override
-                    public void updateButton(@NotNull AnActionEvent e) {
+                    public void update(@NotNull AnActionEvent e) {
                         e.getPresentation().setEnabled(toolList.getSelectedIndex() >= 0);
                     }
                 })
@@ -372,7 +379,16 @@ public final class CustomToolsConfigurable implements Configurable {
                 return;
             }
             Object selected = dataSourceCombo.getSelectedItem();
-            currentEditing.dataSourceName = selected == null ? "" : selected.toString().trim();
+            if (selected instanceof DataSourceItem item) {
+                // 从 DataSourceItem 中读取实际数据源名与项目 hint/path
+                currentEditing.dataSourceName = item.name;
+                currentEditing.projectHint = item.projectHint == null ? "" : item.projectHint;
+                currentEditing.projectPath = item.projectPath == null ? "" : item.projectPath;
+            } else {
+                currentEditing.dataSourceName = selected == null ? "" : selected.toString().trim();
+                currentEditing.projectHint = "";
+                currentEditing.projectPath = "";
+            }
             updateDataSourceValidation();
         });
         sqlModeCombo.addActionListener(e -> {
@@ -538,7 +554,12 @@ public final class CustomToolsConfigurable implements Configurable {
             descriptionArea.setText(def.description == null ? "" : def.description);
             sqlArea.setText(def.sql == null ? "" : def.sql);
             maxRowsField.setText(String.valueOf(def.maxRows > 0 ? def.maxRows : 100));
-            dataSourceCombo.setSelectedItem(def.dataSourceName == null ? "" : def.dataSourceName);
+            // 按 name + projectPath（优先）/ projectHint 精准选中 combo 中的数据源条目
+            selectDataSourceInCombo(
+                    def.dataSourceName == null ? "" : def.dataSourceName,
+                    def.projectHint == null ? "" : def.projectHint,
+                    def.projectPath == null ? "" : def.projectPath
+            );
             // 同步 SQL 类型下拉：0=QUERY，1=DML
             sqlModeCombo.setSelectedIndex(CustomToolDefinition.SQL_MODE_DML.equalsIgnoreCase(def.sqlMode) ? 1 : 0);
             updateDescriptionCounter();
@@ -574,7 +595,13 @@ public final class CustomToolsConfigurable implements Configurable {
             return;
         }
         Object item = dataSourceCombo.getSelectedItem();
-        String value = item == null ? "" : item.toString().trim();
+        // 从 DataSourceItem 或普通字符串中提取实际数据源名称
+        String value;
+        if (item instanceof DataSourceItem di) {
+            value = di.name;
+        } else {
+            value = item == null ? "" : item.toString().trim();
+        }
         if (value.isEmpty()) {
             // 必填未填：红色边框
             dataSourceCombo.setBorder(javax.swing.BorderFactory.createLineBorder(com.intellij.ui.JBColor.RED, 1));
@@ -880,6 +907,7 @@ public final class CustomToolsConfigurable implements Configurable {
         }
         stopParamTableEditing();
         final String dataSource = currentEditing.dataSourceName == null ? "" : currentEditing.dataSourceName.trim();
+        final String projectHint = currentEditing.projectHint == null ? "" : currentEditing.projectHint.trim();
         final String sql = currentEditing.sql == null ? "" : currentEditing.sql;
         if (dataSource.isEmpty()) {
             Messages.showWarningDialog(DatabaseMcpMessages.message("settings.customTools.test.noDataSource"),
@@ -939,10 +967,10 @@ public final class CustomToolsConfigurable implements Configurable {
                     IdeDatabaseFacade facade = new IdeDatabaseFacade();
                     Map<String, Object> result;
                     if (isDml) {
-                        result = facade.executeDmlSqlPrepared("", dataSource, preparedSql, bindValues,
+                        result = facade.executeDmlSqlPrepared(projectHint, dataSource, preparedSql, bindValues,
                                 McpSettingsState.DataSourceScope.ALL);
                     } else {
-                        result = facade.executeQuerySqlPrepared("", dataSource, preparedSql, bindValues, maxRows,
+                        result = facade.executeQuerySqlPrepared(projectHint, dataSource, preparedSql, bindValues, maxRows,
                                 McpSettingsState.DataSourceScope.ALL);
                     }
                     long costMs = (System.nanoTime() - startNanos) / 1_000_000L;
@@ -1033,16 +1061,21 @@ public final class CustomToolsConfigurable implements Configurable {
 
     /**
      * 加载当前生效作用域下的数据源名称到下拉框。
+     *
+     * <p>当多个项目存在同名数据源时，下拉项显示为 {@code "name (project)"}，
+     * 便于用户区分来源；唯一名称仍仅显示 {@code "name"}。</p>
      */
     private void loadDataSourceOptions() {
         if (dataSourceCombo == null) {
             return;
         }
-        List<String> names = new ArrayList<>();
+        List<DataSourceItem> items = new ArrayList<>();
         String errorMsg = null;
         try {
             IdeDatabaseFacade facade = new IdeDatabaseFacade();
             List<Map<String, Object>> rows = facade.listDataSources("", McpSettingsState.DataSourceScope.ALL);
+            // 先全量收集 [name, project, projectPath, scope]，再统计哪些 name 出现多次（需展示来源项目标记）
+            List<String[]> collected = new ArrayList<>();
             for (Map<String, Object> row : rows) {
                 Object n = row.get("name");
                 if (n == null) {
@@ -1054,8 +1087,25 @@ public final class CustomToolsConfigurable implements Configurable {
                     errorMsg = msg == null ? "discovery error" : msg.toString();
                     continue;
                 }
-                if (!names.contains(name)) {
-                    names.add(name);
+                Object p = row.get("project");
+                String project = p == null ? null : p.toString();
+                Object pp = row.get("projectPath");
+                String projectPath = pp == null ? null : pp.toString();
+                Object s = row.get("scope");
+                String scope = s == null ? "" : s.toString();
+                collected.add(new String[]{name, project, projectPath, scope});
+            }
+            // 统计各 name 出现的次数，判断是否需要展示项目来源标签
+            Map<String, Long> nameCount = collected.stream()
+                    .collect(Collectors.groupingBy(arr -> arr[0], Collectors.counting()));
+            // 去重（保留 name+projectPath 组合首次出现的条目）
+            Set<String> seen = new LinkedHashSet<>();
+            for (String[] entry : collected) {
+                // 用 projectPath 去重（比 project 名更精准）
+                String key = entry[0] + "@@" + (entry[2] == null ? (entry[1] == null ? "" : entry[1]) : entry[2]);
+                if (seen.add(key)) {
+                    boolean needsTag = nameCount.getOrDefault(entry[0], 1L) > 1;
+                    items.add(new DataSourceItem(entry[0], entry[1], entry[2], entry[3], needsTag));
                 }
             }
         } catch (Throwable ex) {
@@ -1063,39 +1113,71 @@ public final class CustomToolsConfigurable implements Configurable {
             McpRuntimeLogService.logError("settings.customTools",
                     "Load data sources failed: " + errorMsg);
         }
-        applyDataSourceOptions(names, errorMsg);
+        applyDataSourceOptions(items, errorMsg);
     }
 
-    private void applyDataSourceOptions(List<String> names, String errorMsg) {
+    private void applyDataSourceOptions(List<DataSourceItem> items, String errorMsg) {
         if (dataSourceCombo == null) {
             return;
         }
-        String preferred = currentEditing != null && currentEditing.dataSourceName != null
-                ? currentEditing.dataSourceName.trim()
-                : "";
-        if (preferred.isEmpty()) {
+        // 记录当前期望选中的 name + projectHint + projectPath，优先从 currentEditing 读取
+        String preferredName = currentEditing != null && currentEditing.dataSourceName != null
+                ? currentEditing.dataSourceName.trim() : "";
+        String preferredProject = currentEditing != null ? currentEditing.projectHint : null;
+        String preferredPath = currentEditing != null ? currentEditing.projectPath : null;
+        if (preferredName.isEmpty()) {
             Object selectedItem = dataSourceCombo.getSelectedItem();
-            preferred = selectedItem == null ? "" : selectedItem.toString().trim();
+            if (selectedItem instanceof DataSourceItem di) {
+                preferredName = di.name;
+                preferredProject = di.projectHint;
+                preferredPath = di.projectPath;
+            } else if (selectedItem != null) {
+                preferredName = selectedItem.toString().trim();
+            }
         }
         updatingFromModel = true;
         try {
             dataSourceCombo.removeAllItems();
-            for (String n : names) {
-                dataSourceCombo.addItem(n);
+            for (DataSourceItem item : items) {
+                dataSourceCombo.addItem(item);
             }
-            // 更新已知数据源缓存（仅在成功加载到数据源时刷新，避免加载失败时清空缓存）
-            if (!names.isEmpty()) {
-                knownDataSourceNames = new HashSet<>(names);
+            // 更新已知数据源缓存（仅在成功加载时刷新）
+            if (!items.isEmpty()) {
+                knownDataSourceNames = items.stream()
+                        .map(it -> it.name)
+                        .collect(Collectors.toSet());
             }
-            if (names.isEmpty()) {
-                // 不可编辑模式下用占位 item 显示提示信息（不写入 dataSourceName）
+            if (items.isEmpty()) {
+                // 不可编辑模式下用占位 item 显示提示信息
                 String placeholder = errorMsg != null
                         ? DatabaseMcpMessages.message("settings.customTools.dataSource.loadError", errorMsg)
                         : DatabaseMcpMessages.message("settings.customTools.dataSource.empty");
                 dataSourceCombo.addItem(placeholder);
                 dataSourceCombo.setSelectedIndex(0);
-            } else if (!preferred.isEmpty()) {
-                dataSourceCombo.setSelectedItem(preferred);
+            } else if (!preferredName.isEmpty()) {
+                // 优先按 name + projectPath 完全匹配，其次按 name + projectHint，最后按 name 取第一个
+                DataSourceItem matched = null;
+                for (DataSourceItem item : items) {
+                    if (item.name.equals(preferredName)) {
+                        if (matched == null) {
+                            matched = item;
+                        }
+                        // path 精准匹配优先
+                        if (preferredPath != null && !preferredPath.isBlank()
+                                && Objects.equals(item.projectPath, preferredPath)) {
+                            matched = item;
+                            break;
+                        }
+                        if (Objects.equals(item.projectHint, preferredProject)) {
+                            matched = item;
+                        }
+                    }
+                }
+                if (matched != null) {
+                    dataSourceCombo.setSelectedItem(matched);
+                } else {
+                    dataSourceCombo.setSelectedIndex(0);
+                }
             } else {
                 dataSourceCombo.setSelectedIndex(0);
             }
@@ -1132,6 +1214,8 @@ public final class CustomToolsConfigurable implements Configurable {
                 && java.util.Objects.equals(a.name, b.name)
                 && java.util.Objects.equals(a.description, b.description)
                 && java.util.Objects.equals(a.dataSourceName, b.dataSourceName)
+                && java.util.Objects.equals(a.projectHint, b.projectHint)
+                && java.util.Objects.equals(a.projectPath, b.projectPath)
                 && java.util.Objects.equals(a.sql, b.sql)
                 && a.maxRows == b.maxRows
                 && a.enabled == b.enabled
@@ -1726,6 +1810,97 @@ public final class CustomToolsConfigurable implements Configurable {
                     + "</html>");
             checkBox.setSelected(def != null && def.enabled);
             return panel;
+        }
+    }
+
+    /**
+     * 在 combo 中按 name、projectPath（优先）和 projectHint 精准定位并选中对应条目。
+     *
+     * <p>匹配优先级：name + projectPath 完全匹配 &gt; name + projectHint 匹配 &gt; 同 name 首个条目。
+     * 必须在 {@code updatingFromModel = true} 的上下文中调用，避免触发写回监听。</p>
+     *
+     * @param name        数据源名称
+     * @param projectHint 项目名称 hint，可为空
+     * @param projectPath 项目根路径，可为空；非空时优先用于精准匹配
+     */
+    private void selectDataSourceInCombo(String name, String projectHint, String projectPath) {
+        if (dataSourceCombo == null || name.isEmpty()) {
+            return;
+        }
+        DataSourceItem firstMatch = null;
+        DataSourceItem hintMatch = null;
+        DataSourceItem pathMatch = null;
+        for (int i = 0; i < dataSourceCombo.getItemCount(); i++) {
+            Object item = dataSourceCombo.getItemAt(i);
+            if (item instanceof DataSourceItem di && di.name.equals(name)) {
+                if (firstMatch == null) {
+                    firstMatch = di;
+                }
+                if (projectPath != null && !projectPath.isBlank()
+                        && Objects.equals(di.projectPath, projectPath)) {
+                    pathMatch = di;
+                    break;
+                }
+                if (hintMatch == null && Objects.equals(di.projectHint, projectHint)) {
+                    hintMatch = di;
+                }
+            }
+        }
+        DataSourceItem selected = pathMatch != null ? pathMatch : (hintMatch != null ? hintMatch : firstMatch);
+        if (selected != null) {
+            dataSourceCombo.setSelectedItem(selected);
+        }
+    }
+
+    /**
+     * 数据源选择项：封装实际数据源名称、所属项目与 scope 信息。
+     *
+     * <p>Combo 展示格式示例：
+     * <ul>
+     *   <li>全局：{@code "【全局】- myds"}</li>
+     *   <li>项目：{@code "【项目】- myds -（projectA）"}</li>
+     * </ul>
+     */
+    private static final class DataSourceItem {
+        /**
+         * 数据源实际名称，存储到 {@link CustomToolDefinition#dataSourceName}。
+         */
+        final String name;
+        /**
+         * 所属项目名称，存储到 {@link CustomToolDefinition#projectHint}；全局 scope 时为 null。
+         */
+        final String projectHint;
+        /**
+         * 所属项目根路径，存储到 {@link CustomToolDefinition#projectPath}；全局 scope 时为 null。
+         * 路径全局唯一，优先用于执行时精准定位项目，解决同名项目下的歧义问题。
+         */
+        final String projectPath;
+        /**
+         * 数据源 scope 字符串，如 {@code "GLOBAL"}、{@code "PROJECT"}。
+         */
+        final String scope;
+        /**
+         * Combo 展示文本。
+         */
+        final String displayName;
+
+        DataSourceItem(String name, String projectHint, String projectPath, String scope, boolean needsProjectTag) {
+            this.name = name;
+            this.projectHint = projectHint;
+            this.projectPath = projectPath;
+            this.scope = scope == null ? "" : scope;
+            // 格式：【全局/项目】- 数据源名 -（项目名）
+            String scopeTag = "PROJECT".equalsIgnoreCase(this.scope) ? "【项目】" : "【全局】";
+            StringBuilder sb = new StringBuilder(scopeTag).append("- ").append(name);
+            if (projectHint != null && !projectHint.isBlank()) {
+                sb.append(" -（").append(projectHint).append('）');
+            }
+            this.displayName = sb.toString();
+        }
+
+        @Override
+        public String toString() {
+            return displayName;
         }
     }
 }

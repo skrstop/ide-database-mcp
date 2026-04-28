@@ -4,7 +4,7 @@ plugins {
 }
 
 group = "com.skrstop.ide"
-val baseVersion = "0.1.7"
+val baseVersion = "0.1.8"
 
 
 // 1. 读取命令行参数，默认为 "modern" (包含 新版本特性)

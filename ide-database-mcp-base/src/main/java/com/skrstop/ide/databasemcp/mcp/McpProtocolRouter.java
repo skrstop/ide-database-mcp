@@ -194,6 +194,14 @@ public final class McpProtocolRouter {
         }
 
         String project = args.has("project") ? args.get("project").getAsString() : "";
+        // 优先使用配置中记录的项目路径（全局唯一），其次使用项目名，确保多项目同名数据源时精准路由
+        if (project == null || project.isBlank()) {
+            if (def.projectPath != null && !def.projectPath.isBlank()) {
+                project = def.projectPath;
+            } else if (def.projectHint != null && !def.projectHint.isBlank()) {
+                project = def.projectHint;
+            }
+        }
         McpSettingsState.DataSourceScope scope = parseScopeArg(args);
 
         List<String> varsInOrder = extractSqlVarsInOrder(def.sql);

@@ -78,6 +78,17 @@
     ]]></description>
 
     <change-notes><![CDATA[
+        <b>0.1.8</b>
+        <ul>
+            <li>Multi-project data source support: <code>database_list_datasources</code> now merges data sources across all open projects and returns <code>project</code> and <code>projectPath</code> fields to help AI distinguish same-named data sources from different projects.</li>
+            <li>Custom Tools: Data source selector now displays scope tag (【global】/【project】) and project name in the format <code>【全局/项目】- name -（project）</code>; both <code>projectHint</code> and <code>projectPath</code> are persisted for precise routing at execution time.</li>
+            <li>Ambiguity detection: operations that require a data source now throw a clear error with candidate project names and paths when the data source name is ambiguous across projects.</li>
+            <li>Ambiguity detection: when the <code>project</code> parameter matches multiple projects by name (same name, different path), the error now lists all matching paths and instructs the caller to use a path instead.</li>
+            <li>多项目支持：数据源列表合并多项目，每条数据源记录携带项目名与路径信息。</li>
+            <li>自定义工具数据源选择新增 scope 与项目信息展示，持久化项目名和路径，执行时优先使用路径精准路由。</li>
+            <li>同名数据源/同名项目场景下主动报错并给出候选列表，引导用户/AI 补充精确的 project 路径参数。</li>
+        </ul>
+
         <b>0.1.7</b>
         <ul>
             <li>Custom Tools: Added <b>Copy / Duplicate</b> button in the toolbar (after the remove button) to create a deep copy of the selected custom tool, with auto-generated unique name.</li>

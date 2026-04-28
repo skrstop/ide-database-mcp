@@ -40,6 +40,26 @@ public class CustomToolDefinition {
     public String dataSourceName = "";
 
     /**
+     * 数据源所属的项目提示（项目名称），用于在多项目中存在同名数据源时精准定位。
+     *
+     * <p>当多个项目中存在同名的数据源时，该字段记录用户在 Settings 中选择的来源项目，
+     * 从而在执行 SQL 时避免选错数据源。单项目或全局 scope 下可为空。</p>
+     *
+     * @see com.skrstop.ide.databasemcp.db.IdeDatabaseFacade
+     */
+    public String projectHint = "";
+
+    /**
+     * 数据源所属项目的根路径（basePath），全局唯一，优先于 {@link #projectHint} 用于精准定位项目。
+     *
+     * <p>项目名可能重复，而 basePath 在同一 IDE 实例中唯一，因此执行 SQL 时应优先以此字段
+     * 匹配项目，避免同名项目导致的数据源错误路由。</p>
+     *
+     * @see com.skrstop.ide.databasemcp.db.IdeDatabaseFacade
+     */
+    public String projectPath = "";
+
+    /**
      * 预置 SQL 文本，将作为 SQL 参数执行。
      * <p>支持 {@code ${name}} 形式的命名占位符，运行时按 {@link #parameters} 顺序绑定到
      * {@link java.sql.PreparedStatement}。</p>
@@ -107,6 +127,8 @@ public class CustomToolDefinition {
         CustomToolDefinition c = new CustomToolDefinition(id, name, description, dataSourceName, sql, maxRows);
         c.enabled = enabled;
         c.sqlMode = sqlMode;
+        c.projectHint = projectHint;
+        c.projectPath = projectPath;
         if (parameters != null) {
             for (CustomToolParameter p : parameters) {
                 if (p != null) {

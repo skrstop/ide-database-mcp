@@ -9,6 +9,7 @@ import com.skrstop.ide.databasemcp.settings.McpSettingsState;
 
 import java.sql.*;
 import java.util.*;
+import java.util.stream.Collectors;
 
 public class IdeDatabaseFacade {
     private static final int DEFAULT_ROW_SIZE = 10;
@@ -20,24 +21,61 @@ public class IdeDatabaseFacade {
         return listDataSources(projectHint, null);
     }
 
+    /**
+     * 列出所有匹配 projectHint 的项目下的数据源。
+     *
+     * <p>当 projectHint 为空或存在同名项目时，会合并多个项目的数据源，每条记录附带
+     * {@code project}（项目名）和 {@code projectPath}（项目路径）字段。
+     * 当 scope 为 GLOBAL 时忽略 projectHint，直接查询全局数据源。</p>
+     *
+     * @param projectHint   项目名称或路径提示；为空则返回全部已打开项目的数据源
+     * @param overrideScope 数据源 scope 覆盖；null 时使用全局配置
+     * @return 数据源列表，每条 Map 包含 name/url/driverClass/type/scope/version
+     * 以及 project/projectPath（GLOBAL scope 下不包含后两个字段）
+     */
     public List<Map<String, Object>> listDataSources(String projectHint, McpSettingsState.DataSourceScope overrideScope) {
         McpSettingsState.DataSourceScope scope = resolveScope(overrideScope);
-        Project project = (scope == McpSettingsState.DataSourceScope.GLOBAL) ? null : resolveProject(projectHint);
         List<Map<String, Object>> result = new ArrayList<>();
-        List<DataSourceDiscoveryUtil.ScopedDataSource> scopedDataSources;
-        try {
-            scopedDataSources = discoveryUtil.findScopedDataSources(project, scope);
-        } catch (IllegalStateException ex) {
-            McpRuntimeLogService.logWarn("facade", "Data source discovery failed: " + ex.getMessage());
-            result.add(Map.of(
-                    "name", "__discovery_error__",
-                    "message", ex.getMessage()
-            ));
+
+        if (scope == McpSettingsState.DataSourceScope.GLOBAL) {
+            // 全局 scope 不区分项目，project 传 null
+            try {
+                List<DataSourceDiscoveryUtil.ScopedDataSource> scopedDataSources =
+                        discoveryUtil.findScopedDataSources(null, scope);
+                for (DataSourceDiscoveryUtil.ScopedDataSource scoped : scopedDataSources) {
+                    result.add(mapDataSourceRow(scoped, null));
+                }
+            } catch (IllegalStateException ex) {
+                McpRuntimeLogService.logWarn("facade", "Data source discovery failed: " + ex.getMessage());
+                result.add(Map.of("name", "__discovery_error__", "message", ex.getMessage()));
+            }
             return result;
         }
 
-        for (DataSourceDiscoveryUtil.ScopedDataSource scoped : scopedDataSources) {
-            result.add(mapDataSourceRow(scoped));
+        // PROJECT scope：按 hint 解析多个项目，逐一采集并合并
+        List<Project> projects = resolveProjects(projectHint);
+        if (projects.isEmpty()) {
+            result.add(Map.of("name", "__discovery_error__", "message", "No open projects found"));
+            return result;
+        }
+
+        for (Project project : projects) {
+            try {
+                List<DataSourceDiscoveryUtil.ScopedDataSource> scopedDataSources =
+                        discoveryUtil.findScopedDataSources(project, scope);
+                for (DataSourceDiscoveryUtil.ScopedDataSource scoped : scopedDataSources) {
+                    result.add(mapDataSourceRow(scoped, project));
+                }
+            } catch (IllegalStateException ex) {
+                McpRuntimeLogService.logWarn("facade",
+                        "Data source discovery failed for project [" + project.getName() + "]: " + ex.getMessage());
+                Map<String, Object> errorRow = new HashMap<>();
+                errorRow.put("name", "__discovery_error__");
+                errorRow.put("project", project.getName());
+                errorRow.put("projectPath", project.getBasePath());
+                errorRow.put("message", ex.getMessage());
+                result.add(errorRow);
+            }
         }
         return result;
     }
@@ -281,12 +319,95 @@ public class IdeDatabaseFacade {
     }
 
     private Object resolveRequiredDataSource(String projectHint, String dataSourceName, McpSettingsState.DataSourceScope overrideScope) {
-        Project project = resolveProject(projectHint);
-        Object dataSource = findDataSourceByName(project, dataSourceName, overrideScope);
-        if (dataSource == null) {
+        McpSettingsState.DataSourceScope scope = resolveScope(overrideScope);
+
+        if (scope == McpSettingsState.DataSourceScope.GLOBAL) {
+            // 全局 scope 不依赖 project
+            Object dataSource = findDataSourceByNameInProject(null, dataSourceName, scope);
+            if (dataSource == null) {
+                throw new IllegalArgumentException("Data source not found: " + dataSourceName);
+            }
+            return dataSource;
+        }
+
+        // PROJECT/ALL scope：先校验 projectHint 本身是否有歧义（同名不同路径），再查找数据源
+        if (projectHint != null && !projectHint.isBlank()) {
+            checkProjectHintAmbiguity(projectHint);
+        }
+
+        // 遍历所有匹配项目，收集全部命中的数据源
+        List<Project> projects = resolveProjects(projectHint);
+        List<Map.Entry<Project, Object>> matches = new ArrayList<>();
+        for (Project project : projects) {
+            Object ds = findDataSourceByNameInProject(project, dataSourceName, scope);
+            if (ds != null) {
+                matches.add(Map.entry(project, ds));
+            }
+        }
+
+        if (matches.isEmpty()) {
             throw new IllegalArgumentException("Data source not found: " + dataSourceName);
         }
-        return dataSource;
+
+        // 数据源在多个项目中同名 → 歧义，要求调用方指定 project
+        if (matches.size() > 1) {
+            String projectList = matches.stream()
+                    .map(e -> "\"" + e.getKey().getName() + "\" (path: " + e.getKey().getBasePath() + ")")
+                    .collect(Collectors.joining(", "));
+            throw new IllegalArgumentException(
+                    "Ambiguous data source \"" + dataSourceName + "\": found in multiple projects [" + projectList + "]. "
+                            + "Please specify the 'project' parameter using the project path to disambiguate.");
+        }
+
+        return matches.get(0).getValue();
+    }
+
+    /**
+     * 检查 projectHint 是否匹配多个同名但不同路径的项目。
+     *
+     * <p>当 hint 为路径时（匹配 {@link Project#getBasePath()}）可唯一定位，无需检查；
+     * 当 hint 为项目名且存在多个同名项目时，抛出歧义异常并列出各项目路径，
+     * 引导调用方改用路径作为 project 参数。</p>
+     *
+     * @param projectHint 非空的项目名称或路径
+     * @throws IllegalArgumentException 当项目名称匹配到多个不同路径的项目时
+     */
+    private void checkProjectHintAmbiguity(String projectHint) {
+        Project[] opened = ProjectManager.getInstance().getOpenProjects();
+        // 检查是否有项目的 basePath 与 hint 完全匹配：路径匹配则唯一，无歧义
+        boolean matchedByPath = Arrays.stream(opened)
+                .anyMatch(p -> Objects.equals(p.getBasePath(), projectHint));
+        if (matchedByPath) {
+            return;
+        }
+        // hint 作为项目名匹配，收集所有同名项目
+        List<Project> byName = Arrays.stream(opened)
+                .filter(p -> Objects.equals(p.getName(), projectHint))
+                .collect(Collectors.toList());
+        if (byName.size() > 1) {
+            String pathList = byName.stream()
+                    .map(p -> "\"" + p.getBasePath() + "\"")
+                    .collect(Collectors.joining(", "));
+            throw new IllegalArgumentException(
+                    "Ambiguous project name \"" + projectHint + "\": multiple projects share this name. "
+                            + "Please use the project path instead. Available paths: [" + pathList + "].");
+        }
+    }
+
+    /**
+     * 在指定项目（或全局）中按名称查找数据源。
+     *
+     * @param project 目标项目，null 表示全局 scope
+     * @param name    数据源名称
+     * @param scope   数据源 scope
+     * @return 匹配的数据源对象，未找到时返回 null
+     */
+    private Object findDataSourceByNameInProject(Project project, String name, McpSettingsState.DataSourceScope scope) {
+        return discoveryUtil.findScopedDataSources(project, scope).stream()
+                .map(DataSourceDiscoveryUtil.ScopedDataSource::delegate)
+                .filter(ds -> Objects.equals(DataSourceTypeUtil.resolveDataSourceName(ds), name))
+                .findFirst()
+                .orElse(null);
     }
 
     private Map<String, Object> executeStatementInternal(Object dataSource,
@@ -346,7 +467,7 @@ public class IdeDatabaseFacade {
         return rows;
     }
 
-    private Map<String, Object> mapDataSourceRow(DataSourceDiscoveryUtil.ScopedDataSource scoped) {
+    private Map<String, Object> mapDataSourceRow(DataSourceDiscoveryUtil.ScopedDataSource scoped, Project project) {
         Object ds = scoped.delegate();
         String url = DataSourceTypeUtil.resolveDataSourceUrl(ds);
         String driverClass = DataSourceTypeUtil.resolveDataSourceDriverClass(ds);
@@ -357,6 +478,11 @@ public class IdeDatabaseFacade {
         row.put("type", DataSourceTypeUtil.inferDataSourceType(ds, url, driverClass));
         row.put("scope", scoped.scope().name());
         row.put("version", DataSourceTypeUtil.resolveDataSourceVersion(ds, url, driverClass));
+        // 当存在 project 上下文时，附带项目信息便于多项目场景下区分来源
+        if (project != null) {
+            row.put("project", project.getName());
+            row.put("projectPath", project.getBasePath());
+        }
         return row;
     }
 
@@ -364,31 +490,33 @@ public class IdeDatabaseFacade {
         return overrideScope == null ? McpSettingsState.getInstance().getDataSourceScope() : overrideScope;
     }
 
-    private Project resolveProject(String projectHint) {
+    /**
+     * 按 projectHint 解析多个匹配的已打开项目。
+     *
+     * <ul>
+     *   <li>hint 为空 → 返回全部已打开项目（多项目合并场景）</li>
+     *   <li>hint 有值 → 返回所有名称或路径匹配的项目（同名项目会全部返回）</li>
+     *   <li>无任何匹配时 → 回退为全部已打开项目</li>
+     * </ul>
+     *
+     * @param projectHint 项目名称或 basePath 提示，可为 null
+     * @return 匹配的项目列表，永不为 null
+     */
+    private List<Project> resolveProjects(String projectHint) {
         Project[] opened = ProjectManager.getInstance().getOpenProjects();
         if (opened.length == 0) {
-            return null;
+            return Collections.emptyList();
         }
         if (projectHint == null || projectHint.isBlank()) {
-            return opened[0];
+            // 未指定 hint，返回所有已打开的项目
+            return Arrays.asList(opened);
         }
-        for (Project project : opened) {
-            if (Objects.equals(project.getName(), projectHint) || Objects.equals(project.getBasePath(), projectHint)) {
-                return project;
-            }
-        }
-        return null;
-    }
-
-    private Object findDataSourceByName(Project project, String name, McpSettingsState.DataSourceScope overrideScope) {
-        McpSettingsState.DataSourceScope scope = resolveScope(overrideScope);
-        for (DataSourceDiscoveryUtil.ScopedDataSource scoped : discoveryUtil.findScopedDataSources(project, scope)) {
-            String dsName = DataSourceTypeUtil.resolveDataSourceName(scoped.delegate());
-            if (Objects.equals(dsName, name)) {
-                return scoped.delegate();
-            }
-        }
-        return null;
+        List<Project> matched = Arrays.stream(opened)
+                .filter(p -> Objects.equals(p.getName(), projectHint)
+                        || Objects.equals(p.getBasePath(), projectHint))
+                .collect(Collectors.toList());
+        // 若无精确匹配，回退为全部项目
+        return matched.isEmpty() ? Arrays.asList(opened) : matched;
     }
 
     private static Map<String, Object> mapDatabase(String name, String type) {
