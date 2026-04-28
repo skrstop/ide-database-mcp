@@ -1,5 +1,6 @@
 package com.skrstop.ide.databasemcp.settings;
 
+import com.intellij.util.xmlb.annotations.Property;
 import com.intellij.util.xmlb.annotations.XCollection;
 
 import java.util.ArrayList;
@@ -45,8 +46,11 @@ public class CustomToolDefinition {
      * <p>当多个项目中存在同名的数据源时，该字段记录用户在 Settings 中选择的来源项目，
      * 从而在执行 SQL 时避免选错数据源。单项目或全局 scope 下可为空。</p>
      *
+     * <p>{@code alwaysWrite = true} 强制持久化，便于排查、排重以及多项目环境下的数据源精准匹配。</p>
+     *
      * @see com.skrstop.ide.databasemcp.db.IdeDatabaseFacade
      */
+    @Property(alwaysWrite = true)
     public String projectHint = "";
 
     /**
@@ -55,8 +59,12 @@ public class CustomToolDefinition {
      * <p>项目名可能重复，而 basePath 在同一 IDE 实例中唯一，因此执行 SQL 时应优先以此字段
      * 匹配项目，避免同名项目导致的数据源错误路由。</p>
      *
+     * <p>{@code alwaysWrite = true} 强制持久化，确保 XML 中始终可见，
+     * 用于解决多项目同名数据源的歧义。</p>
+     *
      * @see com.skrstop.ide.databasemcp.db.IdeDatabaseFacade
      */
+    @Property(alwaysWrite = true)
     public String projectPath = "";
 
     /**
@@ -70,9 +78,12 @@ public class CustomToolDefinition {
      * SQL 执行模式：{@code "QUERY"} 表示查询（SELECT），{@code "DML"} 表示写操作（INSERT / UPDATE / DELETE）。
      * <p>默认 {@code "QUERY"}；DML 模式下不返回结果集，仅返回影响行数。</p>
      *
+     * <p>{@code alwaysWrite = true} 强制持久化，避免默认值被 XmlSerializer 省略。</p>
+     *
      * @see #SQL_MODE_QUERY
      * @see #SQL_MODE_DML
      */
+    @Property(alwaysWrite = true)
     public String sqlMode = SQL_MODE_QUERY;
 
     /**

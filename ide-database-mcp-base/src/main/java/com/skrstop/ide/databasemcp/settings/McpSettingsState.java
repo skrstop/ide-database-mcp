@@ -198,7 +198,7 @@ public final class McpSettingsState implements PersistentStateComponent<McpSetti
     public float getCustomToolsSplitterProportion() {
         float v = state.customToolsSplitterProportion;
         if (v < 0.05f || v > 0.95f) {
-            return 0.28f;
+            return 0.15f;
         }
         return v;
     }
@@ -402,9 +402,9 @@ public final class McpSettingsState implements PersistentStateComponent<McpSetti
         public int toolWindowTopDividerLocation = 100;
         public int toolWindowBottomDividerLocation = 220;
         /**
-         * 自定义工具配置页左右分割条的比例（0~1）。默认 0.28。
+         * 自定义工具配置页左右分割条的比例（0~1）。默认 0.15（左侧 15%）。
          */
-        public float customToolsSplitterProportion = 0.28f;
+        public float customToolsSplitterProportion = 0.15f;
         public int maxEntries = 500;
         public long maxFileSize = 10 * 1024 * 1024;
         public int maxLogFiles = 5;

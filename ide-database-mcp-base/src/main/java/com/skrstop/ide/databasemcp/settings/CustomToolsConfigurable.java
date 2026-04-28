@@ -247,7 +247,13 @@ public final class CustomToolsConfigurable implements Configurable {
         });
         // 组件布局完成后再次应用持久化比例，确保初始显示时宽度正确还原
         // （构造函数传入的比例可能因面板尚未可见而未能正确应用）
-        SwingUtilities.invokeLater(() -> splitter.setProportion(initialProportion));
+        // 注意：使用局部变量引用，避免 invokeLater 执行时 disposeUIResources() 已将字段置 null 导致 NPE
+        OnePixelSplitter splitterRef = splitter;
+        SwingUtilities.invokeLater(() -> {
+            if (splitterRef != null) {
+                splitterRef.setProportion(initialProportion);
+            }
+        });
 
         rootPanel = new JPanel(new BorderLayout());
         rootPanel.add(splitter, BorderLayout.CENTER);
