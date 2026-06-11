@@ -78,6 +78,12 @@
     ]]></description>
 
     <change-notes><![CDATA[
+        <b>0.1.9</b>
+        <ul>
+            <li>Fix known issues.</li>
+            <li>修复已知问题。</li>
+        </ul>
+
         <b>0.1.8</b>
         <ul>
             <li>Multi-project data source support: <code>database_list_datasources</code> now merges data sources across all open projects and returns <code>project</code> and <code>projectPath</code> fields to help AI distinguish same-named data sources from different projects.</li>

@@ -15,6 +15,7 @@ import com.intellij.openapi.project.ProjectManager;
 import com.intellij.openapi.ui.ComboBox;
 import com.intellij.openapi.ui.DialogWrapper;
 import com.intellij.openapi.ui.Messages;
+import com.intellij.ui.JBColor;
 import com.intellij.ui.OnePixelSplitter;
 import com.intellij.ui.ToolbarDecorator;
 import com.intellij.ui.components.JBLabel;
@@ -211,8 +212,15 @@ public final class CustomToolsConfigurable implements Configurable {
                 })
                 .disableUpDownActions()
                 .createPanel();
-        // 默认高度缩短一半（原 360 → 180），用户拖动 splitter 后宽度会持久化
-        listPanel.setPreferredSize(new Dimension(220, 180));
+        // 使用显式高对比度颜色绘制边框：JBColor.border() 在新版 UI 主题下与背景过于接近肉眼难辨，
+        // 这里直接指定明/暗主题下都清晰可见的灰色。customLine 会自动在 BorderLayout 中产生 1px 内边距，
+        // 子组件（listPanel）布局在边框内侧，不会覆盖边框像素。
+        JBColor borderColor = new JBColor(new Color(0xA0A0A0), new Color(0x5E6060));
+        JPanel listWrapper = new JPanel(new BorderLayout());
+        listWrapper.setBorder(JBUI.Borders.customLine(borderColor, 1, 1, 1, 1));
+        listWrapper.add(listPanel, BorderLayout.CENTER);
+        // 左侧默认宽度放大 1 倍（原 220 → 440），用户拖动 splitter 后宽度会持久化
+        listWrapper.setPreferredSize(new Dimension(440, 180));
 
         // 右侧详情
         detailPanel = buildDetailPanel();
@@ -222,10 +230,11 @@ public final class CustomToolsConfigurable implements Configurable {
 
         detailCardLayout = new CardLayout();
         detailContainer = new JPanel(detailCardLayout);
-        // 详情区使用纵向滚动；横向方向上让组件自适应宽度，避免内部固定 PreferredSize 撑出横滚
+        // 详情区使用独立的纵/横向滚动条，避免内容撑宽后由外层 Settings 对话框产生
+        // 一条横跨左右两栏的全局横向滚动条（用户需求：左右两侧分别拥有自己的滚动条）。
         JBScrollPane detailScroll = new JBScrollPane(detailPanel,
                 JBScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
-                JBScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+                JBScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
         detailScroll.setBorder(JBUI.Borders.empty());
         detailContainer.add(detailScroll, "DETAIL");
         detailContainer.add(emptyHintLabel, "EMPTY");
@@ -234,7 +243,7 @@ public final class CustomToolsConfigurable implements Configurable {
         // Splitter 初始比例从持久化状态读取，用户拖动后写回
         float initialProportion = McpSettingsState.getInstance().getCustomToolsSplitterProportion();
         splitter = new OnePixelSplitter(false, initialProportion);
-        splitter.setFirstComponent(listPanel);
+        splitter.setFirstComponent(listWrapper);
         splitter.setSecondComponent(detailContainer);
         // 实时保存：用户每次拖动分割条时同步写入持久化状态
         splitter.addPropertyChangeListener("proportion", evt -> {
@@ -257,6 +266,9 @@ public final class CustomToolsConfigurable implements Configurable {
 
         rootPanel = new JPanel(new BorderLayout());
         rootPanel.add(splitter, BorderLayout.CENTER);
+        // 给根面板一个合理的首选宽度，避免外层 Settings 对话框因子组件请求过大宽度
+        // 而出现横跨左右两栏的全局横向滚动条；左右两侧各自滚动由内部 ScrollPane 处理。
+        rootPanel.setPreferredSize(new Dimension(720, 480));
 
         if (!listModel.isEmpty()) {
             toolList.setSelectedIndex(0);

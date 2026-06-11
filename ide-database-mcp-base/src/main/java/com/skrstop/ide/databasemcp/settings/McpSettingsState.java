@@ -404,7 +404,7 @@ public final class McpSettingsState implements PersistentStateComponent<McpSetti
         /**
          * 自定义工具配置页左右分割条的比例（0~1）。默认 0.15（左侧 15%）。
          */
-        public float customToolsSplitterProportion = 0.15f;
+        public float customToolsSplitterProportion = 0.30f;
         public int maxEntries = 500;
         public long maxFileSize = 10 * 1024 * 1024;
         public int maxLogFiles = 5;
