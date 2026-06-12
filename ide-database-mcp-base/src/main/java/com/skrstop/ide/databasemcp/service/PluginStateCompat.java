@@ -15,13 +15,22 @@ public final class PluginStateCompat {
     }
 
     public static boolean isPluginUnavailable(PluginId pluginId) {
-        if (PluginManagerCore.getPlugin(pluginId) == null) {
+        if (!isPluginInstalledCompat(pluginId)) {
             return true;
         }
         if (PluginManagerCore.isDisabled(pluginId)) {
             return true;
         }
         return !isLoadedCompat(pluginId);
+    }
+
+    private static boolean isPluginInstalledCompat(PluginId pluginId) {
+        try {
+            return PluginManagerCore.isPluginInstalled(pluginId);
+        } catch (Error | Exception ignored) {
+            // Fallback for very old platform versions where isPluginInstalled does not exist.
+            return PluginManagerCore.getPlugin(pluginId) != null;
+        }
     }
 
     private static boolean isLoadedCompat(PluginId pluginId) {
