@@ -293,6 +293,28 @@ public final class McpSettingsState implements PersistentStateComponent<McpSetti
         markConfigured(scope, target);
     }
 
+    public boolean isRealtimeLogOutput() {
+        return isRealtimeLogOutput(getPluginSettingsScope());
+    }
+
+    public boolean isRealtimeLogOutput(PluginSettingsScope scope) {
+        return resolveState(scope).realtimeLogOutput;
+    }
+
+    public boolean isRealtimeLogOutputEffective() {
+        return resolveEffectiveState().realtimeLogOutput;
+    }
+
+    public void setRealtimeLogOutput(boolean realtimeLogOutput) {
+        setRealtimeLogOutput(getPluginSettingsScope(), realtimeLogOutput);
+    }
+
+    public void setRealtimeLogOutput(PluginSettingsScope scope, boolean realtimeLogOutput) {
+        State target = resolveState(scope);
+        target.realtimeLogOutput = realtimeLogOutput;
+        markConfigured(scope, target);
+    }
+
     private State resolveState(PluginSettingsScope scope) {
         if (scope == PluginSettingsScope.PROJECT) {
             Project project = currentProject();
@@ -338,7 +360,8 @@ public final class McpSettingsState implements PersistentStateComponent<McpSetti
                 || projectState.maxEntries != 500           // 与 State.maxEntries = 500 保持一致
                 || projectState.maxFileSize != 10 * 1024 * 1024
                 || projectState.maxLogFiles != 5
-                || projectState.readBufferSize != 512 * 1024;
+                || projectState.readBufferSize != 512 * 1024
+                || projectState.realtimeLogOutput;          // 与 State.realtimeLogOutput = false 保持一致
     }
 
     private Project currentProject() {
@@ -409,6 +432,10 @@ public final class McpSettingsState implements PersistentStateComponent<McpSetti
         public long maxFileSize = 10 * 1024 * 1024;
         public int maxLogFiles = 5;
         public int readBufferSize = 512 * 1024;
+        /**
+         * 是否在工具窗口中实时显示日志。默认关闭，兼容旧版本（字段不存在时反序列化为 false）。
+         */
+        public boolean realtimeLogOutput = false;
         /**
          * 用户在 Settings 中配置的自定义 MCP tool 列表。
          *

@@ -78,6 +78,15 @@
     ]]></description>
 
     <change-notes><![CDATA[
+        <b>0.2.0</b>
+        <ul>
+            <li>Real-time log output toggle: added a Toggle Switch in the tool window log area to control whether logs are displayed in real time. When disabled, search and clear buttons are grayed out; log file output is unaffected. Disabled by default for backward compatibility.</li>
+            <li>Settings integration: added a matching real-time output toggle in the Settings log section, automatically synced with the tool window.</li>
+            <li>Custom ToggleSwitch component: native sliding switch UI for a more intuitive on/off experience.</li>
+            <li>When real-time log output is off, search highlight calculations and document listener callbacks are skipped to avoid unnecessary performance overhead.</li>
+            <li>实时日志输出开关：工具窗口日志区域新增 Toggle Switch，关闭后搜索/清空按钮置灰，日志文件写入不受影响。默认关闭，兼容旧版本。</li>
+        </ul>
+
         <b>0.1.9</b>
         <ul>
             <li>Fix known issues.</li>

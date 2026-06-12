@@ -70,6 +70,8 @@ public final class DatabaseMcpToolWindowPanel implements Disposable {
     private final JButton logNextMatchButton;
     private final JButton clearLogButton;
     private final JButton viewLogFilePathButton;
+    private final ToggleSwitch realtimeLogToggleSwitch;
+    private final JLabel realtimeLogLabel;
     private final Timer refreshTimer;
     private final List<int[]> logMatchRanges = new ArrayList<>();
     private int selectedLogMatchIndex = -1;
@@ -77,6 +79,10 @@ public final class DatabaseMcpToolWindowPanel implements Disposable {
     // 缓存上次服务状态，避免每秒无意义的 UI 更新
     private boolean lastRunningState = false;
     private String lastServiceUrl = "";
+
+    // 缓存实时日志输出设置，同步 Settings ↔ ToolWindow
+    private boolean lastRealtimeLogOutput = false;
+    private boolean syncingRealtimeLogToggle = false;
 
     // 缓存上次方法计数器快照，避免无数据变化时重建表格
     private int lastMethodSnapshotHash = 0;
@@ -173,6 +179,9 @@ public final class DatabaseMcpToolWindowPanel implements Disposable {
         logNextMatchButton = new JButton(AllIcons.Actions.FindForward);
         clearLogButton = new JButton();
         viewLogFilePathButton = new JButton();
+        realtimeLogToggleSwitch = new ToggleSwitch(McpSettingsState.getInstance().isRealtimeLogOutputEffective());
+        lastRealtimeLogOutput = realtimeLogToggleSwitch.isSelected();
+        realtimeLogLabel = new JLabel();
 
         serviceSection = buildServiceSection();
         methodCounterSection = buildMethodCounterSection();
@@ -266,8 +275,6 @@ public final class DatabaseMcpToolWindowPanel implements Disposable {
         JPanel section = new JPanel(new BorderLayout(0, 3));
         section.setBorder(BorderFactory.createTitledBorder(""));
 
-        logPrevMatchButton.setText(null);
-        logNextMatchButton.setText(null);
         logPrevMatchButton.setFocusable(false);
         logNextMatchButton.setFocusable(false);
 
@@ -290,6 +297,22 @@ public final class DatabaseMcpToolWindowPanel implements Disposable {
                     DatabaseMcpMessages.message(currentLanguage, "toolwindow.logFileTitle")
             );
         });
+        realtimeLogToggleSwitch.addActionListener(e -> {
+            if (syncingRealtimeLogToggle) return;
+            boolean enabled = realtimeLogToggleSwitch.isSelected();
+            McpSettingsState.getInstance().setRealtimeLogOutput(enabled);
+            lastRealtimeLogOutput = enabled;
+            // 切换后重置日志版本缓存，强制下次刷新重新渲染
+            lastRenderedLogVersion = -1L;
+            renderedLineCount = 0;
+            logOperation("tool-window", "Real-time log output " + (enabled ? "enabled" : "disabled"));
+            setLogControlsEnabled(enabled);
+            refreshLogs();
+        });
+
+        JPanel realtimePanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
+        realtimePanel.add(realtimeLogToggleSwitch);
+        realtimePanel.add(realtimeLogLabel);
 
         JPanel toolbar = new JPanel(new BorderLayout(4, 0));
         toolbar.add(logSearchField, BorderLayout.CENTER);
@@ -301,7 +324,12 @@ public final class DatabaseMcpToolWindowPanel implements Disposable {
         actions.add(viewLogFilePathButton);
         toolbar.add(actions, BorderLayout.EAST);
 
-        section.add(toolbar, BorderLayout.NORTH);
+        JPanel topPanel = new JPanel();
+        topPanel.setLayout(new BoxLayout(topPanel, BoxLayout.Y_AXIS));
+        topPanel.add(realtimePanel);
+        topPanel.add(toolbar);
+
+        section.add(topPanel, BorderLayout.NORTH);
         section.add(logScrollPane, BorderLayout.CENTER);
         return section;
     }
@@ -331,6 +359,7 @@ public final class DatabaseMcpToolWindowPanel implements Disposable {
             refreshTexts(language);
         }
         refreshServiceStatus();
+        refreshRealtimeLogToggle();
         refreshMethodCounters();
         refreshLogs();
     }
@@ -358,6 +387,27 @@ public final class DatabaseMcpToolWindowPanel implements Disposable {
         stopServiceButton.setEnabled(running);
         // 仅在服务运行时显示「添加自定义工具」按钮
         addCustomToolButton.setVisible(running);
+    }
+
+    /**
+     * 同步实时日志输出开关状态：Settings 中修改后，ToolWindow 的 ToggleSwitch 自动跟随。
+     */
+    private void refreshRealtimeLogToggle() {
+        boolean current = McpSettingsState.getInstance().isRealtimeLogOutputEffective();
+        if (current == lastRealtimeLogOutput) {
+            return;
+        }
+        lastRealtimeLogOutput = current;
+        syncingRealtimeLogToggle = true;
+        try {
+            realtimeLogToggleSwitch.setSelected(current);
+        } finally {
+            syncingRealtimeLogToggle = false;
+        }
+        setLogControlsEnabled(current);
+        // 重置日志版本缓存，强制 refreshLogs 立即刷新
+        lastRenderedLogVersion = -1L;
+        renderedLineCount = 0;
     }
 
     /**
@@ -409,6 +459,22 @@ public final class DatabaseMcpToolWindowPanel implements Disposable {
     private int renderedLineCount = 0;
 
     private void refreshLogs() {
+        // 实时日志输出关闭时，仅显示提示信息，禁用搜索控件，不更新日志内容
+        if (!McpSettingsState.getInstance().isRealtimeLogOutputEffective()) {
+            if (lastRenderedLogVersion != -2L) {
+                setLogContent(List.of(DatabaseMcpMessages.message(currentLanguage, "toolwindow.realtimeLogDisabled")));
+                lastRenderedLogVersion = -2L;
+                renderedLineCount = 0;
+                setLogControlsEnabled(false);
+            }
+            return;
+        }
+
+        // 从禁用状态恢复时，重新启用搜索控件
+        if (lastRenderedLogVersion == -2L) {
+            setLogControlsEnabled(true);
+        }
+
         // 先用版本号短路，没有新日志时完全跳过任何工作
         McpRuntimeLogService logService = McpRuntimeLogService.getInstance();
         long currentVersion = logService.version();
@@ -539,22 +605,33 @@ public final class DatabaseMcpToolWindowPanel implements Disposable {
         logSearchField.getTextEditor().getDocument().addDocumentListener(new DocumentListener() {
             @Override
             public void insertUpdate(DocumentEvent e) {
-                updateLogSearchMatches(true);
+                if (McpSettingsState.getInstance().isRealtimeLogOutputEffective()) {
+                    updateLogSearchMatches(true);
+                }
             }
 
             @Override
             public void removeUpdate(DocumentEvent e) {
-                updateLogSearchMatches(true);
+                if (McpSettingsState.getInstance().isRealtimeLogOutputEffective()) {
+                    updateLogSearchMatches(true);
+                }
             }
 
             @Override
             public void changedUpdate(DocumentEvent e) {
-                updateLogSearchMatches(true);
+                if (McpSettingsState.getInstance().isRealtimeLogOutputEffective()) {
+                    updateLogSearchMatches(true);
+                }
             }
         });
     }
 
     private void updateLogSearchMatches(boolean resetSelection) {
+        // 实时日志输出关闭时，跳过搜索高亮计算，避免不必要的性能开销
+        if (!McpSettingsState.getInstance().isRealtimeLogOutputEffective()) {
+            return;
+        }
+
         logMatchRanges.clear();
         clearLogSearchHighlights();
         String query = currentLogSearchQuery();
@@ -627,6 +704,25 @@ public final class DatabaseMcpToolWindowPanel implements Disposable {
     private void setLogSearchButtonsEnabled(boolean enabled) {
         logPrevMatchButton.setEnabled(enabled);
         logNextMatchButton.setEnabled(enabled);
+    }
+
+    /**
+     * 设置日志搜索相关控件的启用/禁用状态。
+     * 实时日志输出关闭时，搜索框、上一个、下一个、清空按钮置灰；日志文件路径按钮保持可用。
+     */
+    private void setLogControlsEnabled(boolean enabled) {
+        logSearchField.setEnabled(enabled);
+        logSearchField.getTextEditor().setEnabled(enabled);
+        logPrevMatchButton.setEnabled(enabled);
+        logNextMatchButton.setEnabled(enabled);
+        clearLogButton.setEnabled(enabled);
+        if (!enabled) {
+            // 禁用时清空搜索高亮和匹配状态
+            logMatchRanges.clear();
+            selectedLogMatchIndex = -1;
+            clearLogSearchHighlights();
+            logSearchField.setText("");
+        }
     }
 
     private String currentLogSearchQuery() {
@@ -737,7 +833,11 @@ public final class DatabaseMcpToolWindowPanel implements Disposable {
         logPrevMatchButton.setToolTipText(DatabaseMcpMessages.message(language, "toolwindow.searchPrevious"));
         logNextMatchButton.setToolTipText(DatabaseMcpMessages.message(language, "toolwindow.searchNext"));
         clearLogButton.setText(DatabaseMcpMessages.message(language, "toolwindow.clearLogs"));
+        realtimeLogLabel.setText(DatabaseMcpMessages.message(language, "toolwindow.realtimeLogOutput"));
         viewLogFilePathButton.setText(DatabaseMcpMessages.message(language, "toolwindow.viewLogFilePath"));
+
+        // 语言切换后重置日志版本缓存，确保日志区域（含"已关闭"提示）以新语言重绘
+        lastRenderedLogVersion = -1L;
 
         rootPanel.revalidate();
         rootPanel.repaint();

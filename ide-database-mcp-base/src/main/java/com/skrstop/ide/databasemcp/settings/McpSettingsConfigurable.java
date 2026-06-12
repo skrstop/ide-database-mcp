@@ -46,6 +46,8 @@ public final class McpSettingsConfigurable implements Configurable {
     private JTextField maxFileSizeField;
     private JTextField maxLogFilesField;
     private JTextField readBufferSizeField;
+    private com.skrstop.ide.databasemcp.toolwindow.ToggleSwitch realtimeLogToggleSwitch;
+    private JLabel realtimeLogLabel;
     private JComboBox<McpSettingsState.PluginSettingsScope> pluginSettingsScopeCombo;
     private JComboBox<McpSettingsState.DataSourceScope> dataSourceScopeCombo;
     private JComboBox<McpSettingsState.UiLanguage> uiLanguageCombo;
@@ -93,6 +95,8 @@ public final class McpSettingsConfigurable implements Configurable {
         readBufferSizeField = new JTextField();
         readBufferSizeField.setColumns(10);
         ((AbstractDocument) readBufferSizeField.getDocument()).setDocumentFilter(new DigitsOnlyDocumentFilter());
+        realtimeLogToggleSwitch = new com.skrstop.ide.databasemcp.toolwindow.ToggleSwitch();
+        realtimeLogLabel = new JLabel();
         pluginSettingsScopeCombo = new JComboBox<>(McpSettingsState.PluginSettingsScope.values());
         dataSourceScopeCombo = new JComboBox<>(McpSettingsState.DataSourceScope.values());
         uiLanguageCombo = new JComboBox<>(McpSettingsState.UiLanguage.values());
@@ -122,6 +126,7 @@ public final class McpSettingsConfigurable implements Configurable {
         maxFileSizeField.setText(String.valueOf(settings.getMaxFileSize(initialScope)));
         maxLogFilesField.setText(String.valueOf(settings.getMaxLogFiles(initialScope)));
         readBufferSizeField.setText(String.valueOf(settings.getReadBufferSize(initialScope)));
+        realtimeLogToggleSwitch.setSelected(settings.isRealtimeLogOutput(initialScope));
 
         uiLanguageCombo.addItemListener(e -> {
             if (e.getStateChange() == ItemEvent.SELECTED && e.getItem() instanceof McpSettingsState.UiLanguage) {
@@ -159,6 +164,20 @@ public final class McpSettingsConfigurable implements Configurable {
         addLogGridItem(logSettingsPanel, maxLogFilesLabel, maxLogFilesField, 0, 1);
         addLogGridItem(logSettingsPanel, readBufferSizeLabel, readBufferSizeField, 1, 1);
 
+        JPanel realtimePanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
+        realtimePanel.add(realtimeLogToggleSwitch);
+        realtimePanel.add(realtimeLogLabel);
+
+        GridBagConstraints realtimeConstraints = new GridBagConstraints();
+        realtimeConstraints.gridx = 0;
+        realtimeConstraints.gridy = 2;
+        realtimeConstraints.gridwidth = 2;
+        realtimeConstraints.weightx = 1;
+        realtimeConstraints.fill = GridBagConstraints.HORIZONTAL;
+        realtimeConstraints.anchor = GridBagConstraints.WEST;
+        realtimeConstraints.insets = FIELD_INSETS_COMPACT;
+        logSettingsPanel.add(realtimePanel, realtimeConstraints);
+
         int row = 0;
         addField(formPanel, languageLabel, uiLanguageCombo, row++);
         addFullWidth(formPanel, autoStartCheckBox, row++);
@@ -189,7 +208,8 @@ public final class McpSettingsConfigurable implements Configurable {
                 || settings.getMaxEntries(selectedScope) != parseIntField(maxEntriesField, settings.getMaxEntries(selectedScope))
                 || settings.getMaxFileSize(selectedScope) != parseLongField(maxFileSizeField, settings.getMaxFileSize(selectedScope))
                 || settings.getMaxLogFiles(selectedScope) != parseIntField(maxLogFilesField, settings.getMaxLogFiles(selectedScope))
-                || settings.getReadBufferSize(selectedScope) != parseIntField(readBufferSizeField, settings.getReadBufferSize(selectedScope));
+                || settings.getReadBufferSize(selectedScope) != parseIntField(readBufferSizeField, settings.getReadBufferSize(selectedScope))
+                || settings.isRealtimeLogOutput(selectedScope) != realtimeLogToggleSwitch.isSelected();
     }
 
     @Override
@@ -245,6 +265,7 @@ public final class McpSettingsConfigurable implements Configurable {
         settings.setMaxFileSize(selectedScope, maxFileSize);
         settings.setMaxLogFiles(selectedScope, maxLogFiles);
         settings.setReadBufferSize(selectedScope, readBufferSize);
+        settings.setRealtimeLogOutput(selectedScope, realtimeLogToggleSwitch.isSelected());
 
         McpServerManager.StartResult result = manager.onSettingsChanged(oldPort);
         if (!result.isSuccess()) {
@@ -268,6 +289,7 @@ public final class McpSettingsConfigurable implements Configurable {
         maxFileSizeField.setText(String.valueOf(settings.getMaxFileSize(scope)));
         maxLogFilesField.setText(String.valueOf(settings.getMaxLogFiles(scope)));
         readBufferSizeField.setText(String.valueOf(settings.getReadBufferSize(scope)));
+        realtimeLogToggleSwitch.setSelected(settings.isRealtimeLogOutput(scope));
         refreshTexts(settings.getUiLanguage(scope));
         updateRuntimeUiState();
     }
@@ -293,6 +315,8 @@ public final class McpSettingsConfigurable implements Configurable {
         maxFileSizeField = null;
         maxLogFilesField = null;
         readBufferSizeField = null;
+        realtimeLogToggleSwitch = null;
+        realtimeLogLabel = null;
         pluginSettingsScopeCombo = null;
         dataSourceScopeCombo = null;
         uiLanguageCombo = null;
@@ -442,6 +466,7 @@ public final class McpSettingsConfigurable implements Configurable {
         maxFileSizeLabel.setText(DatabaseMcpMessages.message(language, "settings.maxFileSize"));
         maxLogFilesLabel.setText(DatabaseMcpMessages.message(language, "settings.maxLogFiles"));
         readBufferSizeLabel.setText(DatabaseMcpMessages.message(language, "settings.readBufferSize"));
+        realtimeLogLabel.setText(DatabaseMcpMessages.message(language, "settings.realtimeLogOutput"));
         if (logSettingsPanel != null) {
             logSettingsPanel.setBorder(BorderFactory.createTitledBorder(
                     DatabaseMcpMessages.message(language, "settings.logGroupTitle")
@@ -481,6 +506,7 @@ public final class McpSettingsConfigurable implements Configurable {
         maxFileSizeField.setText(String.valueOf(settings.getMaxFileSize(scope)));
         maxLogFilesField.setText(String.valueOf(settings.getMaxLogFiles(scope)));
         readBufferSizeField.setText(String.valueOf(settings.getReadBufferSize(scope)));
+        realtimeLogToggleSwitch.setSelected(settings.isRealtimeLogOutput(scope));
         refreshTexts(language);
     }
 
