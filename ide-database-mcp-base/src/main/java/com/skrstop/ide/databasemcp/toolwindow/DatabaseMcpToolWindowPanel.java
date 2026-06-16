@@ -72,6 +72,7 @@ public final class DatabaseMcpToolWindowPanel implements Disposable {
     private final JButton viewLogFilePathButton;
     private final ToggleSwitch realtimeLogToggleSwitch;
     private final JLabel realtimeLogLabel;
+    private final JLabel realtimeLogInfoIcon;
     private final Timer refreshTimer;
     private final List<int[]> logMatchRanges = new ArrayList<>();
     private int selectedLogMatchIndex = -1;
@@ -175,13 +176,28 @@ public final class DatabaseMcpToolWindowPanel implements Disposable {
         syncLogBackground();
 
         logSearchField = new SearchTextField();
-        logPrevMatchButton = new JButton(AllIcons.Actions.FindBackward);
-        logNextMatchButton = new JButton(AllIcons.Actions.FindForward);
+        logPrevMatchButton = new JButton();
+        logNextMatchButton = new JButton();
         clearLogButton = new JButton();
         viewLogFilePathButton = new JButton();
         realtimeLogToggleSwitch = new ToggleSwitch(McpSettingsState.getInstance().isRealtimeLogOutputEffective());
         lastRealtimeLogOutput = realtimeLogToggleSwitch.isSelected();
         realtimeLogLabel = new JLabel();
+        realtimeLogInfoIcon = new JLabel(AllIcons.General.Information);
+        realtimeLogInfoIcon.setToolTipText(DatabaseMcpMessages.message(currentLanguage, "toolwindow.realtimeLogInfo"));
+        realtimeLogInfoIcon.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        realtimeLogInfoIcon.addMouseListener(new java.awt.event.MouseAdapter() {
+            @Override
+            public void mouseClicked(java.awt.event.MouseEvent e) {
+                String tip = realtimeLogInfoIcon.getToolTipText();
+                if (tip == null || tip.isEmpty()) return;
+                JPopupMenu popup = new JPopupMenu();
+                JMenuItem item = new JMenuItem(tip);
+                item.setEnabled(false);
+                popup.add(item);
+                popup.show(realtimeLogInfoIcon, 0, realtimeLogInfoIcon.getHeight());
+            }
+        });
 
         serviceSection = buildServiceSection();
         methodCounterSection = buildMethodCounterSection();
@@ -313,6 +329,7 @@ public final class DatabaseMcpToolWindowPanel implements Disposable {
         JPanel realtimePanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
         realtimePanel.add(realtimeLogToggleSwitch);
         realtimePanel.add(realtimeLogLabel);
+        realtimePanel.add(realtimeLogInfoIcon);
 
         JPanel toolbar = new JPanel(new BorderLayout(4, 0));
         toolbar.add(logSearchField, BorderLayout.CENTER);
@@ -830,10 +847,11 @@ public final class DatabaseMcpToolWindowPanel implements Disposable {
         });
 
         logSearchField.setToolTipText(DatabaseMcpMessages.message(language, "toolwindow.searchPlaceholder"));
-        logPrevMatchButton.setToolTipText(DatabaseMcpMessages.message(language, "toolwindow.searchPrevious"));
-        logNextMatchButton.setToolTipText(DatabaseMcpMessages.message(language, "toolwindow.searchNext"));
+        logPrevMatchButton.setText(DatabaseMcpMessages.message(language, "toolwindow.searchPrevious"));
+        logNextMatchButton.setText(DatabaseMcpMessages.message(language, "toolwindow.searchNext"));
         clearLogButton.setText(DatabaseMcpMessages.message(language, "toolwindow.clearLogs"));
         realtimeLogLabel.setText(DatabaseMcpMessages.message(language, "toolwindow.realtimeLogOutput"));
+        realtimeLogInfoIcon.setToolTipText(DatabaseMcpMessages.message(language, "toolwindow.realtimeLogInfo"));
         viewLogFilePathButton.setText(DatabaseMcpMessages.message(language, "toolwindow.viewLogFilePath"));
 
         // 语言切换后重置日志版本缓存，确保日志区域（含"已关闭"提示）以新语言重绘

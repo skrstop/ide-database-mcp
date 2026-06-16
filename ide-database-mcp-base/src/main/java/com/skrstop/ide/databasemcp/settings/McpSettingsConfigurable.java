@@ -60,6 +60,7 @@ public final class McpSettingsConfigurable implements Configurable {
     private JPanel logSettingsPanel;
     private JPanel connectionSettingsPanel;
     private JLabel heartbeatInfoIcon;
+    private JLabel realtimeLogInfoIcon;
 
     @Override
     public @Nls String getDisplayName() {
@@ -173,9 +174,26 @@ public final class McpSettingsConfigurable implements Configurable {
         addLogGridItem(logSettingsPanel, maxLogFilesLabel, maxLogFilesField, 0, 1);
         addLogGridItem(logSettingsPanel, readBufferSizeLabel, readBufferSizeField, 1, 1);
 
+        realtimeLogInfoIcon = new JLabel(com.intellij.icons.AllIcons.General.Information);
+        realtimeLogInfoIcon.setToolTipText(DatabaseMcpMessages.message("toolwindow.realtimeLogInfo"));
+        realtimeLogInfoIcon.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        realtimeLogInfoIcon.addMouseListener(new java.awt.event.MouseAdapter() {
+            @Override
+            public void mouseClicked(java.awt.event.MouseEvent e) {
+                String tip = realtimeLogInfoIcon.getToolTipText();
+                if (tip == null || tip.isEmpty()) return;
+                JPopupMenu popup = new JPopupMenu();
+                JMenuItem item = new JMenuItem(tip);
+                item.setEnabled(false);
+                popup.add(item);
+                popup.show(realtimeLogInfoIcon, 0, realtimeLogInfoIcon.getHeight());
+            }
+        });
+
         JPanel realtimePanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
         realtimePanel.add(realtimeLogToggleSwitch);
         realtimePanel.add(realtimeLogLabel);
+        realtimePanel.add(realtimeLogInfoIcon);
 
         GridBagConstraints realtimeConstraints = new GridBagConstraints();
         realtimeConstraints.gridx = 0;
@@ -408,6 +426,7 @@ public final class McpSettingsConfigurable implements Configurable {
         logSettingsPanel = null;
         connectionSettingsPanel = null;
         heartbeatInfoIcon = null;
+        realtimeLogInfoIcon = null;
     }
 
     private int parsePortField(int fallback) {
@@ -554,6 +573,9 @@ public final class McpSettingsConfigurable implements Configurable {
             heartbeatInfoIcon.setToolTipText(DatabaseMcpMessages.message(language, "settings.heartbeatInterval.tooltip"));
         }
         realtimeLogLabel.setText(DatabaseMcpMessages.message(language, "settings.realtimeLogOutput"));
+        if (realtimeLogInfoIcon != null) {
+            realtimeLogInfoIcon.setToolTipText(DatabaseMcpMessages.message(language, "toolwindow.realtimeLogInfo"));
+        }
         if (logSettingsPanel != null) {
             logSettingsPanel.setBorder(BorderFactory.createTitledBorder(
                     DatabaseMcpMessages.message(language, "settings.logGroupTitle")
