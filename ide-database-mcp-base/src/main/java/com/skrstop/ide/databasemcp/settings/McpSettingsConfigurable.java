@@ -41,11 +41,13 @@ public final class McpSettingsConfigurable implements Configurable {
     private JLabel maxFileSizeLabel;
     private JLabel maxLogFilesLabel;
     private JLabel readBufferSizeLabel;
+    private JLabel heartbeatIntervalLabel;
     private JTextField portField;
     private JTextField maxEntriesField;
     private JTextField maxFileSizeField;
     private JTextField maxLogFilesField;
     private JTextField readBufferSizeField;
+    private JTextField heartbeatIntervalField;
     private com.skrstop.ide.databasemcp.toolwindow.ToggleSwitch realtimeLogToggleSwitch;
     private JLabel realtimeLogLabel;
     private JComboBox<McpSettingsState.PluginSettingsScope> pluginSettingsScopeCombo;
@@ -56,6 +58,8 @@ public final class McpSettingsConfigurable implements Configurable {
     private JButton startServiceButton;
     private JButton stopServiceButton;
     private JPanel logSettingsPanel;
+    private JPanel connectionSettingsPanel;
+    private JLabel heartbeatInfoIcon;
 
     @Override
     public @Nls String getDisplayName() {
@@ -80,6 +84,7 @@ public final class McpSettingsConfigurable implements Configurable {
         maxFileSizeLabel = new JLabel();
         maxLogFilesLabel = new JLabel();
         readBufferSizeLabel = new JLabel();
+        heartbeatIntervalLabel = new JLabel();
         portField = new JTextField();
         portField.setColumns(8);
         ((AbstractDocument) portField.getDocument()).setDocumentFilter(new DigitsOnlyDocumentFilter());
@@ -95,6 +100,9 @@ public final class McpSettingsConfigurable implements Configurable {
         readBufferSizeField = new JTextField();
         readBufferSizeField.setColumns(10);
         ((AbstractDocument) readBufferSizeField.getDocument()).setDocumentFilter(new DigitsOnlyDocumentFilter());
+        heartbeatIntervalField = new JTextField();
+        heartbeatIntervalField.setColumns(10);
+        ((AbstractDocument) heartbeatIntervalField.getDocument()).setDocumentFilter(new DigitsOnlyDocumentFilter());
         realtimeLogToggleSwitch = new com.skrstop.ide.databasemcp.toolwindow.ToggleSwitch();
         realtimeLogLabel = new JLabel();
         pluginSettingsScopeCombo = new JComboBox<>(McpSettingsState.PluginSettingsScope.values());
@@ -126,6 +134,7 @@ public final class McpSettingsConfigurable implements Configurable {
         maxFileSizeField.setText(String.valueOf(settings.getMaxFileSize(initialScope)));
         maxLogFilesField.setText(String.valueOf(settings.getMaxLogFiles(initialScope)));
         readBufferSizeField.setText(String.valueOf(settings.getReadBufferSize(initialScope)));
+        heartbeatIntervalField.setText(String.valueOf(settings.getHeartbeatInterval(initialScope)));
         realtimeLogToggleSwitch.setSelected(settings.isRealtimeLogOutput(initialScope));
 
         uiLanguageCombo.addItemListener(e -> {
@@ -178,6 +187,44 @@ public final class McpSettingsConfigurable implements Configurable {
         realtimeConstraints.insets = FIELD_INSETS_COMPACT;
         logSettingsPanel.add(realtimePanel, realtimeConstraints);
 
+        // Info icon with tooltip: warns that changing heartbeat restarts the service
+        heartbeatInfoIcon = new JLabel(com.intellij.icons.AllIcons.General.Information);
+        heartbeatInfoIcon.setToolTipText(DatabaseMcpMessages.message("settings.heartbeatInterval.tooltip"));
+        heartbeatInfoIcon.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        heartbeatInfoIcon.addMouseListener(new java.awt.event.MouseAdapter() {
+            @Override
+            public void mouseClicked(java.awt.event.MouseEvent e) {
+                String tip = heartbeatInfoIcon.getToolTipText();
+                if (tip == null || tip.isEmpty()) return;
+                javax.swing.JPopupMenu popup = new javax.swing.JPopupMenu();
+                javax.swing.JMenuItem item = new javax.swing.JMenuItem(tip);
+                item.setEnabled(false);
+                popup.add(item);
+                popup.show(heartbeatInfoIcon, 0, heartbeatInfoIcon.getHeight());
+            }
+        });
+
+        JPanel heartbeatLabelPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 2, 0));
+        heartbeatLabelPanel.add(heartbeatIntervalLabel);
+        heartbeatLabelPanel.add(heartbeatInfoIcon);
+
+        connectionSettingsPanel = new JPanel(new GridBagLayout());
+        GridBagConstraints connLabelConstraints = new GridBagConstraints();
+        connLabelConstraints.gridx = 0;
+        connLabelConstraints.gridy = 0;
+        connLabelConstraints.anchor = GridBagConstraints.WEST;
+        connLabelConstraints.insets = FIELD_INSETS_COMPACT;
+        connectionSettingsPanel.add(heartbeatLabelPanel, connLabelConstraints);
+
+        GridBagConstraints connFieldConstraints = new GridBagConstraints();
+        connFieldConstraints.gridx = 1;
+        connFieldConstraints.gridy = 0;
+        connFieldConstraints.weightx = 1;
+        connFieldConstraints.fill = GridBagConstraints.HORIZONTAL;
+        connFieldConstraints.anchor = GridBagConstraints.WEST;
+        connFieldConstraints.insets = FIELD_INSETS_COMPACT;
+        connectionSettingsPanel.add(heartbeatIntervalField, connFieldConstraints);
+
         int row = 0;
         addField(formPanel, languageLabel, uiLanguageCombo, row++);
         addFullWidth(formPanel, autoStartCheckBox, row++);
@@ -185,6 +232,7 @@ public final class McpSettingsConfigurable implements Configurable {
         addField(formPanel, serviceAddressLabel, addressPanel, row++);
         addField(formPanel, pluginSettingsScopeLabel, pluginScopePanel, row++);
         addField(formPanel, dataSourceScopeLabel, dataSourceScopeCombo, row++);
+        addFullWidth(formPanel, connectionSettingsPanel, row++);
         addFullWidth(formPanel, logSettingsPanel, row);
 
         panel.add(formPanel, BorderLayout.NORTH);
@@ -209,6 +257,7 @@ public final class McpSettingsConfigurable implements Configurable {
                 || settings.getMaxFileSize(selectedScope) != parseLongField(maxFileSizeField, settings.getMaxFileSize(selectedScope))
                 || settings.getMaxLogFiles(selectedScope) != parseIntField(maxLogFilesField, settings.getMaxLogFiles(selectedScope))
                 || settings.getReadBufferSize(selectedScope) != parseIntField(readBufferSizeField, settings.getReadBufferSize(selectedScope))
+                || settings.getHeartbeatInterval(selectedScope) != parseIntField(heartbeatIntervalField, settings.getHeartbeatInterval(selectedScope))
                 || settings.isRealtimeLogOutput(selectedScope) != realtimeLogToggleSwitch.isSelected();
     }
 
@@ -216,6 +265,7 @@ public final class McpSettingsConfigurable implements Configurable {
     public void apply() {
         McpSettingsState settings = McpSettingsState.getInstance();
         int oldPort = settings.getPortEffective();
+        int oldHeartbeatInterval = settings.getHeartbeatIntervalEffective();
         McpSettingsState.PluginSettingsScope selectedScope = selectedPluginSettingsScope();
         McpSettingsState.UiLanguage language = selectedUiLanguage();
 
@@ -256,6 +306,12 @@ public final class McpSettingsConfigurable implements Configurable {
             return;
         }
 
+        Integer heartbeatInterval = parseIntFieldStrict(heartbeatIntervalField);
+        if (heartbeatInterval == null || heartbeatInterval < 1) {
+            showError(language, DatabaseMcpMessages.message(language, "settings.invalidHeartbeatInterval"));
+            return;
+        }
+
         settings.setPluginSettingsScope(selectedScope);
         settings.setAutoStart(selectedScope, autoStartCheckBox.isSelected());
         settings.setPort(selectedScope, parsedPort);
@@ -265,11 +321,33 @@ public final class McpSettingsConfigurable implements Configurable {
         settings.setMaxFileSize(selectedScope, maxFileSize);
         settings.setMaxLogFiles(selectedScope, maxLogFiles);
         settings.setReadBufferSize(selectedScope, readBufferSize);
+        settings.setHeartbeatInterval(selectedScope, heartbeatInterval);
         settings.setRealtimeLogOutput(selectedScope, realtimeLogToggleSwitch.isSelected());
+
+        boolean portChanged = oldPort != settings.getPortEffective();
+        boolean heartbeatChanged = oldHeartbeatInterval != settings.getHeartbeatIntervalEffective();
 
         McpServerManager.StartResult result = manager.onSettingsChanged(oldPort);
         if (!result.isSuccess()) {
             showError(language, DatabaseMcpMessages.message(language, "settings.startFailed") + "\n" + result.getMessage());
+            refreshTexts(language);
+            updateRuntimeUiState();
+            return;
+        }
+
+        // Heartbeat interval changed but port didn't — force restart so the new interval takes effect.
+        // If port also changed, onSettingsChanged already restarted with all new settings.
+        if (heartbeatChanged && !portChanged && manager.isRunning()) {
+            manager.stop("settings-sse-heartbeat-changed");
+            McpServerManager.StartResult restartResult = manager.startWithValidation("settings-heartbeat-changed");
+            if (restartResult.isSuccess()) {
+                Messages.showInfoMessage(
+                        DatabaseMcpMessages.message(language, "settings.serviceRestarted"),
+                        DatabaseMcpMessages.message(language, "settings.error.title")
+                );
+            } else {
+                showError(language, DatabaseMcpMessages.message(language, "settings.startFailed") + "\n" + restartResult.getMessage());
+            }
         }
 
         refreshTexts(language);
@@ -289,6 +367,7 @@ public final class McpSettingsConfigurable implements Configurable {
         maxFileSizeField.setText(String.valueOf(settings.getMaxFileSize(scope)));
         maxLogFilesField.setText(String.valueOf(settings.getMaxLogFiles(scope)));
         readBufferSizeField.setText(String.valueOf(settings.getReadBufferSize(scope)));
+        heartbeatIntervalField.setText(String.valueOf(settings.getHeartbeatInterval(scope)));
         realtimeLogToggleSwitch.setSelected(settings.isRealtimeLogOutput(scope));
         refreshTexts(settings.getUiLanguage(scope));
         updateRuntimeUiState();
@@ -310,11 +389,13 @@ public final class McpSettingsConfigurable implements Configurable {
         maxFileSizeLabel = null;
         maxLogFilesLabel = null;
         readBufferSizeLabel = null;
+        heartbeatIntervalLabel = null;
         portField = null;
         maxEntriesField = null;
         maxFileSizeField = null;
         maxLogFilesField = null;
         readBufferSizeField = null;
+        heartbeatIntervalField = null;
         realtimeLogToggleSwitch = null;
         realtimeLogLabel = null;
         pluginSettingsScopeCombo = null;
@@ -325,6 +406,8 @@ public final class McpSettingsConfigurable implements Configurable {
         startServiceButton = null;
         stopServiceButton = null;
         logSettingsPanel = null;
+        connectionSettingsPanel = null;
+        heartbeatInfoIcon = null;
     }
 
     private int parsePortField(int fallback) {
@@ -466,10 +549,19 @@ public final class McpSettingsConfigurable implements Configurable {
         maxFileSizeLabel.setText(DatabaseMcpMessages.message(language, "settings.maxFileSize"));
         maxLogFilesLabel.setText(DatabaseMcpMessages.message(language, "settings.maxLogFiles"));
         readBufferSizeLabel.setText(DatabaseMcpMessages.message(language, "settings.readBufferSize"));
+        heartbeatIntervalLabel.setText(DatabaseMcpMessages.message(language, "settings.heartbeatInterval"));
+        if (heartbeatInfoIcon != null) {
+            heartbeatInfoIcon.setToolTipText(DatabaseMcpMessages.message(language, "settings.heartbeatInterval.tooltip"));
+        }
         realtimeLogLabel.setText(DatabaseMcpMessages.message(language, "settings.realtimeLogOutput"));
         if (logSettingsPanel != null) {
             logSettingsPanel.setBorder(BorderFactory.createTitledBorder(
                     DatabaseMcpMessages.message(language, "settings.logGroupTitle")
+            ));
+        }
+        if (connectionSettingsPanel != null) {
+            connectionSettingsPanel.setBorder(BorderFactory.createTitledBorder(
+                    DatabaseMcpMessages.message(language, "settings.connectionGroupTitle")
             ));
         }
         serviceStatusLabel.setText(DatabaseMcpMessages.message(language, "settings.serviceStatus"));
@@ -506,6 +598,7 @@ public final class McpSettingsConfigurable implements Configurable {
         maxFileSizeField.setText(String.valueOf(settings.getMaxFileSize(scope)));
         maxLogFilesField.setText(String.valueOf(settings.getMaxLogFiles(scope)));
         readBufferSizeField.setText(String.valueOf(settings.getReadBufferSize(scope)));
+        heartbeatIntervalField.setText(String.valueOf(settings.getHeartbeatInterval(scope)));
         realtimeLogToggleSwitch.setSelected(settings.isRealtimeLogOutput(scope));
         refreshTexts(language);
     }

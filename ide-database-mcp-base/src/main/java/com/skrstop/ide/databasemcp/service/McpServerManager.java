@@ -5,18 +5,13 @@ import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.components.Service;
 import com.intellij.openapi.extensions.PluginId;
 import com.skrstop.ide.databasemcp.db.IdeDatabaseFacade;
-import com.skrstop.ide.databasemcp.mcp.McpHttpHandler;
+import com.skrstop.ide.databasemcp.mcp.McpJavalinHandler;
 import com.skrstop.ide.databasemcp.settings.DatabaseMcpMessages;
 import com.skrstop.ide.databasemcp.settings.McpSettingsState;
-import com.sun.net.httpserver.HttpServer;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -28,13 +23,10 @@ public final class McpServerManager implements Disposable {
     private static final String BIND_HOST = "0.0.0.0";
     private static final String DISPLAY_HOST = "127.0.0.1";
     private static final String MCP_PATH = "/mcp";
-    // 优雅关闭的超时时间（秒）
-    private static final long GRACEFUL_SHUTDOWN_TIMEOUT = 10;
 
     private final ReentrantLock lock = new ReentrantLock();
     private final AtomicBoolean running = new AtomicBoolean(false);
-    private HttpServer httpServer;
-    private ExecutorService httpServerExecutor;
+    private McpJavalinHandler javalinHandler;
     private volatile int runningPort = -1;
 
     public static final class StartResult {
@@ -121,25 +113,14 @@ public final class McpServerManager implements Disposable {
                 return StartResult.success("Database MCP already running.");
             }
 
-            InetSocketAddress address = new InetSocketAddress(BIND_HOST, port);
-            httpServer = HttpServer.create(address, 0);
-            httpServer.createContext(MCP_PATH, new McpHttpHandler(new IdeDatabaseFacade()));
-            httpServer.createContext("/health", exchange -> {
-                byte[] ok = "ok".getBytes();
-                exchange.sendResponseHeaders(200, ok.length);
-                exchange.getResponseBody().write(ok);
-                exchange.close();
-            });
-            // 创建可管理的线程池，支持优雅关闭
-            httpServerExecutor = createHttpServerExecutor();
-            httpServer.setExecutor(httpServerExecutor);
-            httpServer.start();
+            javalinHandler = new McpJavalinHandler(new IdeDatabaseFacade());
+            javalinHandler.start(port);
 
             runningPort = port;
             running.set(true);
             McpRuntimeLogService.logInfo("server", "Service started: " + getServiceUrl() + " (" + reason + ")");
             return StartResult.success("Database MCP started at " + getServiceUrl());
-        } catch (IOException ex) {
+        } catch (Exception ex) {
             McpRuntimeLogService.logError("server", "Failed to start service: " + ex.getMessage());
             stop("start-failed");
             return StartResult.failure("Failed to start Database MCP: " + ex.getMessage());
@@ -148,23 +129,13 @@ public final class McpServerManager implements Disposable {
         }
     }
 
-    public void startIfNeeded(String reason) {
-        StartResult result = startWithValidation(reason);
-        if (!result.isSuccess()) {
-            McpRuntimeLogService.logWarn("server", result.getMessage());
-        }
-    }
-
     public void stop(String reason) {
         lock.lock();
         try {
-            if (httpServer != null) {
-                httpServer.stop(0);
-                httpServer = null;
+            if (javalinHandler != null) {
+                javalinHandler.stop();
+                javalinHandler = null;
             }
-            // 优雅关闭线程池
-            shutdownExecutorGracefully(httpServerExecutor);
-            httpServerExecutor = null;
 
             running.set(false);
             runningPort = -1;
@@ -213,73 +184,6 @@ public final class McpServerManager implements Disposable {
         if (running.get()) {
             McpRuntimeLogService.logInfo("server", "Gracefully shutting down on application exit");
             stop("application-exit");
-        }
-    }
-
-    /**
-     * 创建可管理的线程池，用于 HttpServer
-     * 相比 Executors.newCachedThreadPool()，这个实现可以优雅关闭
-     */
-    private ExecutorService createHttpServerExecutor() {
-        ThreadPoolExecutor executor = new ThreadPoolExecutor(
-                2,                      // corePoolSize: 最少保持 2 个线程
-                10,                     // maximumPoolSize: 最多 10 个线程
-                60,                     // keepAliveTime: 空闲 60 秒后回收
-                TimeUnit.SECONDS,       // 时间单位
-                new LinkedBlockingQueue<>(100), // 队列大小 100
-                r -> {
-                    Thread t = new Thread(r, "McpServer-Http-Worker");
-                    t.setDaemon(false); // 不使用 daemon，确保优雅关闭
-                    return t;
-                }
-        );
-        // 允许核心线程超时后被回收
-        executor.allowCoreThreadTimeOut(true);
-        return executor;
-    }
-
-    /**
-     * 优雅关闭线程池
-     * 等待现有请求完成，然后再关闭
-     */
-    private void shutdownExecutorGracefully(ExecutorService executor) {
-        if (executor == null || executor.isShutdown()) {
-            return;
-        }
-
-        try {
-            McpRuntimeLogService.logInfo("server", "Starting graceful shutdown of HttpServer executor pool");
-
-            // 第一步：停止接收新任务
-            executor.shutdown();
-
-            // 第二步：等待现有任务完成（带超时）
-            if (!executor.awaitTermination(GRACEFUL_SHUTDOWN_TIMEOUT, TimeUnit.SECONDS)) {
-                McpRuntimeLogService.logWarn("server", "HttpServer executor did not terminate within " + GRACEFUL_SHUTDOWN_TIMEOUT +
-                        " seconds, forcing shutdown");
-
-                // 第三步：强制关闭所有任务
-                var unfinishedTasks = executor.shutdownNow();
-                if (!unfinishedTasks.isEmpty()) {
-                    McpRuntimeLogService.logWarn("server", "Forced shutdown of " + unfinishedTasks.size() + " pending tasks");
-                }
-
-                // 再等待一次，确保所有线程都已停止
-                if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
-                    McpRuntimeLogService.logError("server", "HttpServer executor failed to shutdown after forced termination");
-                }
-            } else {
-                McpRuntimeLogService.logInfo("server", "HttpServer executor gracefully shut down");
-            }
-        } catch (InterruptedException ex) {
-            McpRuntimeLogService.logWarn("server", "Interrupted while waiting for HttpServer executor shutdown: " + ex.getMessage());
-            // 再次尝试强制关闭
-            var unfinishedTasks = executor.shutdownNow();
-            if (!unfinishedTasks.isEmpty()) {
-                McpRuntimeLogService.logWarn("server", "Forced shutdown of " + unfinishedTasks.size() + " pending tasks after interruption");
-            }
-            // 恢复中断状态
-            Thread.currentThread().interrupt();
         }
     }
 }

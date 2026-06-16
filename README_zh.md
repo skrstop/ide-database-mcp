@@ -44,6 +44,10 @@ AI 助手直接查询 IDE 内配置的数据库。
     - `database_execute_nosql_query` — NoSQL 查询用途工具。
     - `database_execute_nosql_write_delete` — NoSQL 写入/删除用途工具。
 - 执行约束以工具说明和参数说明为准：调用方需自行选择正确工具；服务端不做 SQL/NoSQL 关键字判断。
+- **SSE（Server-Sent Events）支持**：实现 MCP Streamable HTTP 传输协议，支持 GET 请求实时流式传输
+    - GET `/mcp` 配合 `Accept: text/event-stream` 建立 SSE 连接
+    - 通过 `Mcp-Session-Id` 头进行会话管理
+    - 支持服务器主动推送消息和通知
 - 插件设置页面：`Settings | Tools | Database MCP`
 - 支持本地 MCP 服务自动启动
 - 支持数据源范围控制：`GLOBAL` / `PROJECT` / `ALL`
@@ -130,6 +134,66 @@ curl -s http://127.0.0.1:8765/mcp \
 ### 4.1）数据库列举兼容性
 
 `database_list_databases` 依赖 IDE 数据源提供的 JDBC 元数据。若连接器未暴露 catalog/schema，建议使用执行工具手动查询。
+
+### 4.2）SSE（Server-Sent Events）支持
+
+MCP 服务器支持 SSE 实现实时流式传输和服务器主动推送消息，使用 **Javalin** 实现简洁可靠的 SSE 处理。
+
+#### 建立 SSE 连接
+
+```bash
+# 连接到 SSE 端点
+curl -N http://127.0.0.1:8765/mcp
+```
+
+服务器将响应：
+
+- `Content-Type: text/event-stream` 头
+- `Mcp-Session-Id: <uuid>` 会话 ID 头
+- 初始 `endpoint` 事件，包含 POST URL
+- 初始 `message` 事件，包含能力信息
+
+#### 在 POST 请求中使用会话 ID
+
+建立 SSE 连接后，在后续 POST 请求中包含会话 ID：
+
+```bash
+# 使用从 SSE 连接获取的会话 ID
+curl -s http://127.0.0.1:8765/mcp \
+  -H 'Content-Type: application/json' \
+  -H 'Mcp-Session-Id: <your-session-id>' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize"}'
+```
+
+#### SSE 事件格式
+
+事件遵循标准 SSE 格式：
+
+```
+event: endpoint
+data: /mcp
+
+event: message
+data: {"jsonrpc":"2.0","method":"notifications/initialized","params":{...}}
+```
+
+#### 会话生命周期
+
+1. 客户端发送 GET `/mcp` 配合 `Accept: text/event-stream`
+2. 服务器创建会话并在 `Mcp-Session-Id` 头中返回会话 ID
+3. 连接保持打开状态，用于服务器主动推送消息
+4. 客户端在后续 POST 请求中使用会话 ID
+5. 连接关闭时会话自动清理
+
+#### 实现细节
+
+SSE 实现使用 **Javalin 6.1.3**，提供：
+
+- 内置 SSE 支持，API 简洁
+- 自动连接管理
+- 心跳支持（每 30 秒）
+- 事件广播
+- 正确的资源清理
 
 ### 5）执行 SQL 示例
 

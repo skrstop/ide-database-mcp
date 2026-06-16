@@ -315,6 +315,30 @@ public final class McpSettingsState implements PersistentStateComponent<McpSetti
         markConfigured(scope, target);
     }
 
+    public int getHeartbeatInterval() {
+        return getHeartbeatInterval(getPluginSettingsScope());
+    }
+
+    public int getHeartbeatInterval(PluginSettingsScope scope) {
+        int value = resolveState(scope).heartbeatInterval;
+        return value >= 1 ? value : 5;
+    }
+
+    public int getHeartbeatIntervalEffective() {
+        int value = resolveEffectiveState().heartbeatInterval;
+        return value >= 1 ? value : 5;
+    }
+
+    public void setHeartbeatInterval(int heartbeatInterval) {
+        setHeartbeatInterval(getPluginSettingsScope(), heartbeatInterval);
+    }
+
+    public void setHeartbeatInterval(PluginSettingsScope scope, int heartbeatInterval) {
+        State target = resolveState(scope);
+        target.heartbeatInterval = Math.max(1, heartbeatInterval);
+        markConfigured(scope, target);
+    }
+
     private State resolveState(PluginSettingsScope scope) {
         if (scope == PluginSettingsScope.PROJECT) {
             Project project = currentProject();
@@ -361,7 +385,8 @@ public final class McpSettingsState implements PersistentStateComponent<McpSetti
                 || projectState.maxFileSize != 10 * 1024 * 1024
                 || projectState.maxLogFiles != 5
                 || projectState.readBufferSize != 512 * 1024
-                || projectState.realtimeLogOutput;          // 与 State.realtimeLogOutput = false 保持一致
+                || projectState.realtimeLogOutput           // 与 State.realtimeLogOutput = false 保持一致
+                || projectState.heartbeatInterval != 5;     // 与 State.heartbeatInterval = 5 保持一致
     }
 
     private Project currentProject() {
@@ -436,6 +461,10 @@ public final class McpSettingsState implements PersistentStateComponent<McpSetti
          * 是否在工具窗口中实时显示日志。默认关闭，兼容旧版本（字段不存在时反序列化为 false）。
          */
         public boolean realtimeLogOutput = false;
+        /**
+         * SSE 心跳间隔（秒）。默认 5 秒，最小 1 秒。
+         */
+        public int heartbeatInterval = 5;
         /**
          * 用户在 Settings 中配置的自定义 MCP tool 列表。
          *

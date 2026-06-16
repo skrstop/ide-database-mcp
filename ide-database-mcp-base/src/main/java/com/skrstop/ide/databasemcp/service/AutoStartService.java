@@ -40,11 +40,13 @@ public final class AutoStartService {
         McpSettingsState.UiLanguage language = settings.getUiLanguage(scope);
         String message = DatabaseMcpMessages.message(language, "settings.startFailed") + "\n" + result.getMessage();
         String title = DatabaseMcpMessages.message(language, "settings.error.title");
-        if (project != null) {
-            Messages.showErrorDialog(project, message, title);
-        } else {
-            Messages.showErrorDialog(message, title);
-        }
+        ApplicationManager.getApplication().invokeLater(() -> {
+            if (project != null) {
+                Messages.showErrorDialog(project, message, title);
+            } else {
+                Messages.showErrorDialog(message, title);
+            }
+        });
     }
 }
 

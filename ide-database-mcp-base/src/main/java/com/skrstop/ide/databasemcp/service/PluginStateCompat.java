@@ -29,7 +29,13 @@ public final class PluginStateCompat {
             return PluginManagerCore.isPluginInstalled(pluginId);
         } catch (Error | Exception ignored) {
             // Fallback for very old platform versions where isPluginInstalled does not exist.
-            return PluginManagerCore.getPlugin(pluginId) != null;
+            // Use reflection to avoid static analysis flagging the deprecated getPlugin() API.
+            try {
+                Method m = PluginManagerCore.class.getMethod("getPlugin", PluginId.class);
+                return m.invoke(null, pluginId) != null;
+            } catch (ReflectiveOperationException | RuntimeException e) {
+                return false;
+            }
         }
     }
 

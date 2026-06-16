@@ -54,6 +54,11 @@ bundled `com.intellij.database` plugin is available and enabled.
     - `database_execute_nosql_write_delete` — NoSQL write/delete-use tool.
 - Execution constraints are description-driven: callers must select the right tool from tool/parameter descriptions;
   the server does not enforce SQL/NoSQL intent via keyword parsing or hardcoded DB-type gating.
+- **SSE (Server-Sent Events) support**: Implements MCP Streamable HTTP transport with GET requests for real-time
+  streaming
+    - GET `/mcp` with `Accept: text/event-stream` establishes an SSE connection
+    - Session management via `Mcp-Session-Id` header
+    - Supports server-initiated messages and notifications
 - Settings UI: `Settings | Tools | Database MCP`
 - Auto-start option for the local MCP service
 - Data source scope control: `GLOBAL` / `PROJECT` / `ALL`
@@ -141,6 +146,67 @@ curl -s http://127.0.0.1:8765/mcp \
 
 `database_list_databases` relies on JDBC metadata exposed by the IDE data source. If a connector does not expose
 catalog/schema metadata, use execute tools for manual inspection.
+
+### 4.2) SSE (Server-Sent Events) Support
+
+The MCP server supports SSE for real-time streaming and server-initiated messages, implemented using **Javalin** for
+clean and reliable SSE handling.
+
+#### Establishing an SSE Connection
+
+```bash
+# Connect to SSE endpoint
+curl -N http://127.0.0.1:8765/mcp
+```
+
+The server will respond with:
+
+- `Content-Type: text/event-stream`
+- `Mcp-Session-Id: <uuid>` header
+- Initial `endpoint` event with the POST URL
+- Initial `message` event with capabilities
+
+#### Using Session ID in POST Requests
+
+After establishing an SSE connection, include the session ID in subsequent POST requests:
+
+```bash
+# Use the session ID from the SSE connection
+curl -s http://127.0.0.1:8765/mcp \
+  -H 'Content-Type: application/json' \
+  -H 'Mcp-Session-Id: <your-session-id>' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize"}'
+```
+
+#### SSE Event Format
+
+Events follow the standard SSE format:
+
+```
+event: endpoint
+data: /mcp
+
+event: message
+data: {"jsonrpc":"2.0","method":"notifications/initialized","params":{...}}
+```
+
+#### Session Lifecycle
+
+1. Client sends GET `/mcp` with `Accept: text/event-stream`
+2. Server creates session and returns session ID in `Mcp-Session-Id` header
+3. Connection remains open for server-initiated messages
+4. Client uses session ID in subsequent POST requests
+5. Session is cleaned up when connection is closed
+
+#### Implementation Details
+
+The SSE implementation uses **Javalin 6.1.3** which provides:
+
+- Built-in SSE support with clean API
+- Automatic connection management
+- Heartbeat support (every 30 seconds)
+- Event broadcasting
+- Proper resource cleanup
 
 ### 5) Run a SQL example
 

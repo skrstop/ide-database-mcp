@@ -18,6 +18,7 @@ import java.util.regex.Pattern;
 
 public final class McpProtocolRouter {
     private static final Gson GSON = new Gson();
+    private static final String DEFAULT_PROTOCOL_VERSION = "2025-11-25";
     private final IdeDatabaseFacade databaseFacade;
     // Tool names and metadata are centralized in McpToolDefinitions; use those constants directly where needed.
 
@@ -25,6 +26,9 @@ public final class McpProtocolRouter {
         this.databaseFacade = databaseFacade;
     }
 
+    /**
+     * @return JSON-RPC response string, or {@code null} for notifications (caller should return 202 with no body)
+     */
     public String handle(String requestBody) {
         long startNanos = System.nanoTime();
         String methodKey = "rpc:unknown";
@@ -35,8 +39,14 @@ public final class McpProtocolRouter {
             JsonObject params = req.has("params") && req.get("params").isJsonObject() ? req.getAsJsonObject("params") : new JsonObject();
             methodKey = "rpc:" + method;
 
+            // MCP notifications have no id field — accept silently (202, no response body)
+            if (id == null || id.isJsonNull()) {
+                McpRuntimeLogService.logInfo("router", "Notification received: " + method + " (ignored)");
+                return null;
+            }
+
             return switch (method) {
-                case "initialize" -> ok(id, initializeResult());
+                case "initialize" -> ok(id, initializeResult(params));
                 case "tools/list" -> handleToolsList(id);
                 case "tools/call" -> handleToolCall(id, params);
                 default -> error(id, -32601, "Method not found: " + method);
@@ -49,13 +59,20 @@ public final class McpProtocolRouter {
         }
     }
 
-    private Map<String, Object> initializeResult() {
+    private Map<String, Object> initializeResult(JsonObject params) {
+        String negotiatedProtocolVersion = DEFAULT_PROTOCOL_VERSION;
+        if (params != null && params.has("protocolVersion") && !params.get("protocolVersion").isJsonNull()) {
+            String requested = params.get("protocolVersion").getAsString();
+            if (requested != null && !requested.isBlank()) {
+                negotiatedProtocolVersion = requested;
+            }
+        }
         return Map.of(
-                "protocolVersion", "2024-11-05",
+                "protocolVersion", negotiatedProtocolVersion,
                 "capabilities", Map.of(
                         "tools", Map.of("listChanged", false)
                 ),
-                "serverInfo", Map.of("name", "ide-database-mcp", "version", "0.1.0")
+                "serverInfo", Map.of("name", "ide-database-mcp", "version", "0.2.1")
         );
     }
 

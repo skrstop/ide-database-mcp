@@ -18,6 +18,7 @@ repositories {
 
 dependencies {
     implementation("com.google.code.gson:gson:2.11.0")
+    implementation("io.javalin:javalin:6.1.3")
     compileOnly("org.projectlombok:lombok:1.18.38")
     annotationProcessor("org.projectlombok:lombok:1.18.38")
     testCompileOnly("org.projectlombok:lombok:1.18.38")

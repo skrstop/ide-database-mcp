@@ -78,6 +78,12 @@
     ]]></description>
 
     <change-notes><![CDATA[
+        <b>0.2.1</b>
+        <ul>
+            <li>Added SSE (Server-Sent Events) protocol support for MCP Streamable HTTP transport.</li>
+            <li>Fixed known issues.</li>
+        </ul>
+
         <b>0.2.0</b>
         <ul>
             <li>Real-time log output toggle: added a Toggle Switch in the tool window log area to control whether logs are displayed in real time. When disabled, search and clear buttons are grayed out; log file output is unaffected. Disabled by default for backward compatibility.</li>
